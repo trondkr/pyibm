@@ -1,14 +1,18 @@
 import os, sys, string
-import Ngl, Nio
-import numpy, datetime, types, math
+import netCDF4
+from netCDF4 import Dataset
+from netCDF4 import num2date
+import datetime, types, math
+import numpy as np
 
 """
 Import modules created as part of project
 """
-import IOnetcdf
-import IOroms
+import grd
+import IOverticalGrid
 import IOtime
 import IOlight
+import date
 
 __author__   = 'Trond Kristiansen'
 __email__    = 'trond.kristiansen@imr.no'
@@ -26,33 +30,100 @@ def help():
     print __doc__
     return
     
-def init(time, eta, xi):
+def init(time):
     """
     init: initializes the reading of files and definition of global variables
     """
     log       = True
     filename  = "/Volumes/MacintoshHD1/jordi/gyrnlr_avg_test.nc"
     filename ="/Volumes/MacintoshHD1/jordi/gyrnhr_avg_all.nc"
-    Nstations = 1
     
     varlist=['temp','salt','u','v','nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
     
     """
     Open the netcdf file if it existst.
     """
-    cdf_file      = IOnetcdf.read_netcdf_file(filename, log)
+    cdf = Dataset(filename)
     """
     Calculate the sigma to meters matrix. This is important as all variables in the netcdf file are stored
-    aat sigma layers. To be able to convert from sigma to meters we use this function.
+    at sigma layers. To be able to convert from sigma to meters we use this function.
     """
-    z_r           = IOroms.sigma2meters(cdf_file, time, log)
-    """
-    Extract the variables at the given station (eta,xi) forthe number of time-steps (time)
-    """
-    var_array_raw = IOnetcdf.get_data(cdf_file, varlist, time, z_r, eta, xi, log)
-    
-    return var_array_raw, z_r
+    grdSTATION = grd.grdClass(fileNameIn,"STATION")
+    IOverticalGrid.get_z_levels(grdSTATION)
 
+    """
+    Get the time information and find the indices for start and stop data to extract relative to
+    the time period wanted. Takes input data:
+    startDate="DD/MM/YYYY" and endDate="DD/MM/YYYY" or if none given, finds all date
+    """
+    getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None)
+    
+    """
+    Extract the variables at the given station and store in the grdSTATION object
+    """
+    IOnetcdf.getStationData(cdf, varlist, time, grdSTATION, log)
+    
+    
+def getTimeIndices(cdf,grdSTATION,startDate,endDate):
+    """Get all the time stamps from file"""
+    time=cdf.variables["time"][:]
+    startJDFile =int(time[0])
+    endJDFile   =int(time[-1])
+    """
+    Create a date object to keep track of Julian dates etc.
+    Also create a reference date starting at 1948/01/01.
+    Go here to check results:http://lena.gsfc.nasa.gov/lenaDEV/html/doy_conv.html
+    """
+    ref_date = date.Date()
+    ref_date.day=1
+    ref_date.month=1
+    ref_date.year=1948
+    jdref=ref_date.ToJDNumber()
+    
+    """Figure out the date from the JD number. I have consistently used JD numbers
+    relative to 01/01/1948 and you therefore have to add that jdref number
+    to calculate the correct date using the date module."""
+    startDateFile=date.DateFromJDNumber(startJDFile+jdref)
+    endDateFile=date.DateFromJDNumber(startJDFile+jdref)
+    
+    print "station contains data for the time period:"
+    print "%2i/%2i/4i to %2i/%2i/4i"%(int(startDateFile.day),int(startDateFile.month),int(startDateFile.year),
+                        int(endDateFile.day),int(endDateFile.month),int(endDateFile.year))
+    
+    """Now find the Juian dates of the time period you have asked for and see
+    if it exists in the file. If so, the find the indices that correspond to the
+    time period."""
+    d = string.split(startDate,'/')
+    start_date = date.Date()
+    start_date.day=int(d[0])
+    start_date.month=int(d[0])
+    start_date.year=int(d[0])
+    jdstart=start_date.ToJDNumber()
+
+    d = string.split(endDate,'/')
+    end_date = date.Date()
+    end_date.day=int(d[0])
+    end_date.month=int(d[0])
+    end_date.year=int(d[0])
+    jdend=end_date.ToJDNumber()
+    
+    if jdstart < startJDFile+jdref:
+        print "Start time preceeds the earliest time stamp found in file"
+        print "Required in File: %i/%i/%i"%(int(end_date.day),int(end_date.month),int(end_date.year))
+        print "Actually in File: %i/%i/%i"%(int(endDateFile.day),int(endDateFile.month),int(endDateFile.year))
+        
+        exit()
+    if jdend > endJDFile+jdref:
+        print "End time proceeds the latest time stamp found in file"
+        print "Required in File: %i/%i/%i"%(int(start_date.day),int(start_date.month),int(start_date.year))
+        print "Actually in File: %i/%i/%i"%(int(startDateFile.day),int(startDateFile.month),int(startDateFile.year))
+        exit()
+    if jdend < endJDFile+jdref and jdstart < startJDFile+jdref:
+        
+  
+    
+    print '\nCurrent time of SODA file : %s/%s/%s'%(soda_date.year,soda_date.month,soda_date.day)
+  
 def ibm():
     os.system("clear")
     """
@@ -115,20 +186,20 @@ def ibm():
     Create array for each individual larvae
     """
     
-    larva_array=numpy.zeros((Nlarva, Nhours, Ndepths, 3),float) 
-    W=numpy.zeros((Nlarva),float)
-    W_AF=numpy.zeros((Nlarva),float)
-    S=numpy.zeros((Nlarva),float)
-    Age=numpy.zeros((Nlarva),float)
-    L=numpy.zeros((Nlarva),float)
-    R=numpy.zeros(13,float)
-    enc=numpy.zeros(13,float)
-    hand=numpy.zeros(13,float)
-    pca=numpy.zeros(13,float)
-    ing=numpy.zeros(13,float)
-    ingrate=numpy.zeros((Nlarva),float)
-    Psurvive=numpy.ones((Nlarva),float)
-    Growth=numpy.zeros((Nlarva, Nhours),float)
+    larva_array=np.zeros((Nlarva, Nhours, Ndepths, 3),float) 
+    W=np.zeros((Nlarva),float)
+    W_AF=np.zeros((Nlarva),float)
+    S=np.zeros((Nlarva),float)
+    Age=np.zeros((Nlarva),float)
+    L=np.zeros((Nlarva),float)
+    R=np.zeros(13,float)
+    enc=np.zeros(13,float)
+    hand=np.zeros(13,float)
+    pca=np.zeros(13,float)
+    ing=np.zeros(13,float)
+    ingrate=np.zeros((Nlarva),float)
+    Psurvive=np.ones((Nlarva),float)
+    Growth=np.zeros((Nlarva, Nhours),float)
     
     
     # Initialize Calanus
