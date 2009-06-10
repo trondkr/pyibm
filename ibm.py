@@ -8,11 +8,20 @@ import numpy as np
 """
 Import modules created as part of project
 """
+
+""" Get self made modules"""
+dir='/Users/trond/Projects/arcwarm/SODA/soda2roms'
+
+if os.path.isdir(dir):
+    sys.path.append(dir)
+
+
 import grd
 import IOverticalGrid
 import IOtime
 import IOlight
 import date
+import IOnetcdf
 
 __author__   = 'Trond Kristiansen'
 __email__    = 'trond.kristiansen@imr.no'
@@ -30,45 +39,46 @@ def help():
     print __doc__
     return
     
-def init(time):
+def init():
     """
     init: initializes the reading of files and definition of global variables
     """
     log       = True
-    filename  = "/Volumes/MacintoshHD1/jordi/gyrnlr_avg_test.nc"
-    filename ="/Volumes/MacintoshHD1/jordi/gyrnhr_avg_all.nc"
+    fileNameIn  = "/Users/trond/Projects/arcwarm/SODA/soda2roms/station_lat_41.5423_lon_-66.5233.xyz"
     
-    varlist=['temp','salt','u','v','nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
+    varlist=['temp','salt','u','v'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
+    startDate='20/2/1991'
+    endDate='10/10/1994'
     
     """
     Open the netcdf file if it existst.
     """
-    cdf = Dataset(filename)
+    cdf = Dataset(fileNameIn)
     """
     Calculate the sigma to meters matrix. This is important as all variables in the netcdf file are stored
     at sigma layers. To be able to convert from sigma to meters we use this function.
     """
     grdSTATION = grd.grdClass(fileNameIn,"STATION")
-    IOverticalGrid.get_z_levels(grdSTATION)
+    #IOverticalGrid.get_z_levels(grdSTATION)
 
     """
     Get the time information and find the indices for start and stop data to extract relative to
     the time period wanted. Takes input data:
     startDate="DD/MM/YYYY" and endDate="DD/MM/YYYY" or if none given, finds all date
     """
-    getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None)
+    getTimeIndices(cdf,grdSTATION,startDate,endDate)
     
     """
     Extract the variables at the given station and store in the grdSTATION object
     """
-    IOnetcdf.getStationData(cdf, varlist, time, grdSTATION, log)
+    IOnetcdf.getStationData(cdf,varlist,grdSTATION,log)
     
-    
-def getTimeIndices(cdf,grdSTATION,startDate,endDate):
-    """Get all the time stamps from file"""
-    time=cdf.variables["time"][:]
-    startJDFile =int(time[0])
-    endJDFile   =int(time[-1])
+    return grdSTATION
+
+def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None):
+    """Get start and stop time stamps from file"""
+    startJDFile =int(grdSTATION.time[0])
+    endJDFile   =int(grdSTATION.time[-1])
     """
     Create a date object to keep track of Julian dates etc.
     Also create a reference date starting at 1948/01/01.
@@ -83,71 +93,75 @@ def getTimeIndices(cdf,grdSTATION,startDate,endDate):
     """Figure out the date from the JD number. I have consistently used JD numbers
     relative to 01/01/1948 and you therefore have to add that jdref number
     to calculate the correct date using the date module."""
+ 
     startDateFile=date.DateFromJDNumber(startJDFile+jdref)
-    endDateFile=date.DateFromJDNumber(startJDFile+jdref)
-    
-    print "station contains data for the time period:"
-    print "%2i/%2i/4i to %2i/%2i/4i"%(int(startDateFile.day),int(startDateFile.month),int(startDateFile.year),
-                        int(endDateFile.day),int(endDateFile.month),int(endDateFile.year))
+    endDateFile=date.DateFromJDNumber(endJDFile+jdref)
+   
+    print "\nStation contains data for the time period:"
+    print "%s to %s"%(startDateFile, endDateFile)
     
     """Now find the Juian dates of the time period you have asked for and see
     if it exists in the file. If so, the find the indices that correspond to the
-    time period."""
+    time period.
+    """
+
     d = string.split(startDate,'/')
     start_date = date.Date()
     start_date.day=int(d[0])
-    start_date.month=int(d[0])
-    start_date.year=int(d[0])
+    start_date.month=int(d[1])
+    start_date.year=int(d[2])
     jdstart=start_date.ToJDNumber()
 
     d = string.split(endDate,'/')
     end_date = date.Date()
     end_date.day=int(d[0])
-    end_date.month=int(d[0])
-    end_date.year=int(d[0])
+    end_date.month=int(d[1])
+    end_date.year=int(d[2])
     jdend=end_date.ToJDNumber()
     
     if jdstart < startJDFile+jdref:
         print "Start time preceeds the earliest time stamp found in file"
         print "Required in File: %i/%i/%i"%(int(end_date.day),int(end_date.month),int(end_date.year))
         print "Actually in File: %i/%i/%i"%(int(endDateFile.day),int(endDateFile.month),int(endDateFile.year))
-        
         exit()
+        
     if jdend > endJDFile+jdref:
         print "End time proceeds the latest time stamp found in file"
         print "Required in File: %i/%i/%i"%(int(start_date.day),int(start_date.month),int(start_date.year))
         print "Actually in File: %i/%i/%i"%(int(startDateFile.day),int(startDateFile.month),int(startDateFile.year))
         exit()
-    if jdend < endJDFile+jdref and jdstart < startJDFile+jdref:
         
-  
+    if jdend < endJDFile+jdref and jdstart > startJDFile+jdref:
+        print "Time period to extract was found within the time period available in the file..."
+        print "--> %s - %s"%(startDate,endDate)
+        
+        for i in range(grdSTATION.time.shape[0]):
+            if grdSTATION.time[i] +jdref < jdstart:
+                FOUND=False
+                continue
+            elif grdSTATION.time[i] + jdref >= jdstart and FOUND is False:
+                print "\nFound first time index that fits start point:"
+                print "%s at index %i => %s"%(grdSTATION.time[i]+jdref,i,jdstart)
+                grdSTATION.startIndex=i
+                FOUND=True
+        for i in range(grdSTATION.time.shape[0]):
+            if grdSTATION.time[i] +jdref < jdend:
+                FOUND=False
+                continue
+            elif grdSTATION.time[i] + jdref >= jdend and FOUND is False:
+                print "Found first time index that fits end point:"
+                print "%s at index %i => %s\n"%(grdSTATION.time[i]+jdref,i,jdend)
+                grdSTATION.endIndex=i
+                FOUND=True
+    print "Total number of days extracted: %s"%(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
+    grdSTATION.totalDays=(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
     
-    print '\nCurrent time of SODA file : %s/%s/%s'%(soda_date.year,soda_date.month,soda_date.day)
-  
 def ibm():
     os.system("clear")
     """
-    Position of the station that calculations are done for.
-    This need to be converted to longitude and latitude at some stage
-    """
- #   x_rho(46,38)= 146000 meters from the origin (0 m)
- #   y_rho(46,38)= 173060 meters from the origin
-    low_res = True
-    high_res = False
-    
-    if low_res is True:
-        eta  = 38
-        xi   = 46
-    elif high_res is True:
-        eta = 75
-        xi = 90
-  
-    time = 20
-    """
     Read the netcdf file and create the input arrays needed by the ibm
     """
-    var_array, z_r = init(time, eta, xi)
-    print var_array.shape
+    grdSTATION = init()
     
     """
     Define global variables
@@ -171,10 +185,10 @@ def ibm():
     Ke_larvae = 1
     Ke_predator = 1              
     attenuation_coeff = 0.18
-    Ndepths=len(z_r[1,:,eta,xi])
+    Ndepths=len(grdSTATION.depth)
     Nhours =24
     Nlarva=29
-    Ndays=time
+    Ndays=grdSTATION.totalDays
     Lat = 41.0
     
     # TODO: Init year, month, day should be from netcdf file
