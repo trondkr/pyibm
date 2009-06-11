@@ -20,6 +20,8 @@ def getStationData(cdf, varlist, grdSTATION, log):
     t= (grdSTATION.endIndex-grdSTATION.startIndex)
     var_array_raw=np.zeros((t, int(len(grdSTATION.depth)), Nvars),dtype=np.float64)
     var_number=0
+    
+    grdSTATION.time=cdf.variables['time'][grdSTATION.startIndex:grdSTATION.endIndex]
 
     for var in varlist:
         print var_array_raw.shape

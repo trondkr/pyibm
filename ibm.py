@@ -2,7 +2,7 @@ import os, sys, string
 import netCDF4
 from netCDF4 import Dataset
 from netCDF4 import num2date
-import datetime, types, math
+import datetime, types
 import numpy as np
 
 """
@@ -47,8 +47,8 @@ def init():
     fileNameIn  = "/Users/trond/Projects/arcwarm/SODA/soda2roms/station_lat_41.5423_lon_-66.5233.xyz"
     
     varlist=['temp','salt','u','v'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
-    startDate='20/2/1991'
-    endDate='10/10/1994'
+    startDate='1/5/1991'
+    endDate='1/10/1991'
     
     """
     Open the netcdf file if it existst.
@@ -89,6 +89,7 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None):
     ref_date.month=1
     ref_date.year=1948
     jdref=ref_date.ToJDNumber()
+    grdSTATION.jdref=jdref
     
     """Figure out the date from the JD number. I have consistently used JD numbers
     relative to 01/01/1948 and you therefore have to add that jdref number
@@ -111,7 +112,7 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None):
     start_date.month=int(d[1])
     start_date.year=int(d[2])
     jdstart=start_date.ToJDNumber()
-
+    
     d = string.split(endDate,'/')
     end_date = date.Date()
     end_date.day=int(d[0])
@@ -142,7 +143,9 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None):
             elif grdSTATION.time[i] + jdref >= jdstart and FOUND is False:
                 print "\nFound first time index that fits start point:"
                 print "%s at index %i => %s"%(grdSTATION.time[i]+jdref,i,jdstart)
-                grdSTATION.startIndex=i
+                grdSTATION.startIndex=i-1
+                grdSTATION.start_date = date.Date()
+                grdSTATION.start_date =date.DateFromJDNumber(jdstart)
                 FOUND=True
         for i in range(grdSTATION.time.shape[0]):
             if grdSTATION.time[i] +jdref < jdend:
@@ -152,11 +155,16 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None):
                 print "Found first time index that fits end point:"
                 print "%s at index %i => %s\n"%(grdSTATION.time[i]+jdref,i,jdend)
                 grdSTATION.endIndex=i
+                grdSTATION.end_date = date.Date()
+                grdSTATION.end_date =date.DateFromJDNumber(jdend)
+                
+    
                 FOUND=True
     print "Total number of days extracted: %s"%(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
     grdSTATION.totalDays=(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
     
 def ibm():
+    
     os.system("clear")
     """
     Read the netcdf file and create the input arrays needed by the ibm
@@ -187,37 +195,47 @@ def ibm():
     attenuation_coeff = 0.18
     Ndepths=len(grdSTATION.depth)
     Nhours =24
-    Nlarva=29
-    Ndays=grdSTATION.totalDays
-    Lat = 41.0
+    Nlarva=1
+    Ndays=int(grdSTATION.totalDays)
+    Lat = grdSTATION.lat
     
-    # TODO: Init year, month, day should be from netcdf file
-    yyyy=2007
-    mm=1
-    dd=1
-    julian = IOtime.julian_day(yyyy,mm,dd,0)
+    time=date.Date()
+    time.year=grdSTATION.start_date.year
+    time.month=grdSTATION.start_date.month
+    time.day=grdSTATION.start_date.day
+    
+    """ julian is the time used to control the larvae, while
+    julianFileA and julianFileB are the time stamps of inbetween
+    the larvae recides relative to time from file. Temperature is
+    interpolated to date julian from julianFileA and julianFileB"""
+    
+    julian=time.ToJDNumber()
+    julianFileA=grdSTATION.time[0]+grdSTATION.jdref
+    julianFileB=grdSTATION.time[1]+grdSTATION.jdref
+    julianIndex=0
+    
     """
     Create array for each individual larvae
     """
     
-    larva_array=np.zeros((Nlarva, Nhours, Ndepths, 3),float) 
-    W=np.zeros((Nlarva),float)
-    W_AF=np.zeros((Nlarva),float)
-    S=np.zeros((Nlarva),float)
-    Age=np.zeros((Nlarva),float)
-    L=np.zeros((Nlarva),float)
-    R=np.zeros(13,float)
-    enc=np.zeros(13,float)
-    hand=np.zeros(13,float)
-    pca=np.zeros(13,float)
-    ing=np.zeros(13,float)
-    ingrate=np.zeros((Nlarva),float)
-    Psurvive=np.ones((Nlarva),float)
-    Growth=np.zeros((Nlarva, Nhours),float)
+    larva_array=np.zeros((Nlarva, Nhours, Ndepths, 3),dtype=np.float64) 
+    W=np.zeros((Nlarva),dtype=np.float64)
+    W_AF=np.zeros((Nlarva),dtype=np.float64)
+    S=np.zeros((Nlarva),dtype=np.float64)
+    Age=np.zeros((Nlarva),dtype=np.float64)
+    L=np.zeros((Nlarva),dtype=np.float64)
+    R=np.zeros(13,dtype=np.float64)
+    enc=np.zeros(13,dtype=np.float64)
+    hand=np.zeros(13,dtype=np.float64)
+    pca=np.zeros(13,dtype=np.float64)
+    ing=np.zeros(13,dtype=np.float64)
+    ingrate=np.zeros((Nlarva),dtype=np.float64)
+    Psurvive=np.ones((Nlarva),dtype=np.float64)
+    Growth=np.zeros((Nlarva, Nhours),dtype=np.float64)
     
     
     # Initialize Calanus
-    calanus_D  = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
+    calanus_D  = [0.0, 50.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
     calanus_W  = [0.33, 0.49, 1., 1.51,2.09, 2.76, 4.18, 13.24, 23.13, 63.64, 169.58, 276.29, 276.29] #(micrograms)
     calanus_L1 = [0.22, 0.27, 0.4, 0.48, 0.55, 0.61, 0.79, 1.08, 1.38, 1.8, 2.43, 2.11, 2.11] #(length in mm)
     calanus_L2 = [0.1, 0.1, 0.1, 0.15,  0.18, 0.2, 0.22, 0.25, 0.31, 0.41, 0.52, 0.65, 0.65] #(width in mm)
@@ -229,42 +247,49 @@ def ibm():
         Age[i] = 0
        
     for day in range(Ndays):
-        julian=julian+1
         for ind in range(Nlarva):
-                depth = abs(z_r[day,ind,eta,xi])
+                depth = abs(grdSTATION.depth[ind])
                 
+                # TODO: Fix so that you can use any timestep. Do this by making the loop
+                # count on Nsteps instead of Nhours, where Nsteps*dt=Nhours.
                 for hour in range(Nhours):
-                    L[ind] = math.exp(2.296 + 0.277*math.log(W[ind]) - 0.005128*math.log(W[ind])**2)
+                    L[ind] = np.exp(2.296 + 0.277*np.log(W[ind]) - 0.005128*np.log(W[ind])**2)
                     
-                    gtime=IOtime.julian_to_date(julian, hour)
+                    currentDate=IOtime.julian_to_date(julian, hour)
+                 
+                    julian      = IOtime.julian_day(currentDate[0],currentDate[1],currentDate[2],hour)
                     
-                    dd=gtime[2]
-                    mm=gtime[1]
-                    yyy=gtime[0]
-                    julian = IOtime.julian_day(yyyy,mm,dd,hour)
+                    """
+                    Calculate weights to use on input data from file"""
+                    dwA = abs(julian) - abs(julianFileA)
+                    dwB = abs(julianFileB) - abs(julian)
+                    
+                    s_light = IOlight.surface_light(2440000,grdSTATION.lat,hour);
                    
-                    s_light = IOlight.surface_light(2440000, Lat, hour);
-                   
-                    Eb = s_light*math.exp(attenuation_coeff*(-depth));
+                    Eb = s_light*np.exp(attenuation_coeff*(-depth));
                    
                     """
                     Mouthsize of larvae. The larvae can only capture calanus of sizes less
                     than the larval mouthsize. Folkvord et al.
                     """
-                    m = math.exp (-3.27+1.818*math.log(L[ind])-0.1219*(math.log(L[ind]))**2.)
+                    m = np.exp (-3.27+1.818*np.log(L[ind])-0.1219*(np.log(L[ind]))**2.)
                     
-                    meta = dt*2.38e-7*math.exp(0.088*7)*((W[ind]*1000)**(0.9)*0.001)
+                    meta = dt*2.38e-7*np.exp(0.088*7)*((W[ind]*1000)**(0.9)*0.001)
                     if Eb > 0.001:
                         if L[ind] > 5.5:
                             meta = (2.5*meta)
                         else:
                             meta = (1.4*meta);
+                    """Interpolate the values of temp, salt, u and v velocity in time to current julian date"""
+                    Tdata=(grdSTATION.data[julianIndex,ind,0])*(dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,ind,0])*(dwB/(dwA+dwB))
+                    Sdata=(grdSTATION.data[julianIndex,ind,1])*(dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,ind,1])*(dwB/(dwA+dwB))
+                    Udata=(grdSTATION.data[julianIndex,ind,2])*(dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,ind,2])*(dwB/(dwA+dwB))
+                    Vdata=(grdSTATION.data[julianIndex,ind,3])*(dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,ind,3])*(dwB/(dwA+dwB))
                     
-                    T=var_array[day,ind,0]
-                    
-                    assi = 0.8*(1.0 - 0.4*math.exp(-0.002*(W[ind]/mm2m-30.0)))
-                    GR = sec2day*math.log(0.01*(1.08 + 1.79*T - 0.074*T*math.log(W[ind]) - 0.0965*T*math.log(W[ind])**2 + 0.0112*T*math.log(W[ind])**3) + 1)*dt  
-                    GR_gram = (math.exp(GR) - 1)*W[ind]
+                    assi = 0.8*(1.0 - 0.4*np.exp(-0.002*(W[ind]/mm2m-30.0)))
+                    GR = sec2day*np.log(0.01*(1.08 + 1.79*Tdata - 0.074*Tdata*np.log(W[ind])
+                                              - 0.0965*Tdata*np.log(W[ind])**2 + 0.0112*Tdata*np.log(W[ind])**3) + 1)*dt  
+                    GR_gram = (np.exp(GR) - 1)*W[ind]
                                    
                    
                     for j in range(13):
@@ -274,51 +299,62 @@ def ibm():
 
                     for j in range(13):
                         hand[j] = 0.264*10**(7.0151*(calanus_L1[j]/L[ind])) # Walton 1992
-                        enc[j] = (0.667*math.pi*(R[j]**3.)*f + math.pi*(R[j]**2.)*math.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * calanus_D[j]* ltr2mm3*(var_array[day,ind,3]*100.0)
+                        enc[j] = (0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * calanus_D[j]* ltr2mm3
                         pca[j] = enc[j]*max(0.0,min(1.0,-16.7*(calanus_L1[j]/L[ind]) + 3.0/2.0))
-                        ing[j] = 3600.*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]);
+                        ing[j] = dt*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]);
                       
-                    W_old = W[ind];
-                    S_old = S[ind];
+                    W_old = W[ind]
+                    S_old = S[ind]
                     S[ind] = min(gut_size*W[ind],S_old + sum(ing[:]))
                     ingrate[ind] = (S[ind] - S_old)/W[ind]
                     W[ind] = W[ind] + min(GR_gram + meta,S[ind]*assi) - meta #- 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta;
                     S[ind] = S[ind] - ((W[ind] - W_old) + meta)/assi # + 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta)/assi;
                     
-                    W_AF[ind] = W_AF[ind] + (math.exp(GR)-1)*W_AF[ind]
+                    W_AF[ind] = W_AF[ind] + (np.exp(GR)-1)*W_AF[ind]
              
-                    L[ind] = min(L[ind],math.exp(2.296 + 0.277*math.log(W[ind]) - 0.005128*math.log(W[ind])**2))
+                    L[ind] = min(L[ind],np.exp(2.296 + 0.277*np.log(W[ind]) - 0.005128*np.log(W[ind])**2))
                     Ap_larvae = 0.1*L[ind]**2*mm2m**2
                     Rpisci = IOlight.get_perception_distance(attenuation_coeff,Ke_predator,Ap_larvae,Eb)
                   
-                    Psurvive[ind] = math.exp(-a*(L[ind]**b) - C2*(1-Pe)*Rpisci**2)*float(Psurvive[ind])
+                    Psurvive[ind] = np.exp(-a*(L[ind]**b) - C2*(1-Pe)*Rpisci**2)*float(Psurvive[ind])
                     
                     
                     Growth[ind, hour]=((W[ind]-W_old)/W_old)*100.0
                 if depth <= 60:
-                    if mm<10:
-                        print_mm='0'+str(mm)
+                    if currentDate[1]<10:
+                        print_mm='0'+str(currentDate[1])
                     else:
-                        print_mm=str(mm)
-                    if dd<10:
-                        print_dd='0'+str(dd)
+                        print_mm=str(currentDate[1])
+                    if time.day<10:
+                        print_dd='0'+str(currentDate[2])
                     else:
-                        print_dd=str(dd)
-                    print_date=str(yyyy)+'-'+print_mm+'-'+str(print_dd)+'T00:00'
-                    print '%s\t %f\t %f\t %s'%(print_date, -depth, sum(Growth[ind]), var_array[day,ind,6])
+                        print_dd=str(currentDate[2])
+                    print_date=str(currentDate[0])+'-'+print_mm+'-'+str(print_dd)+'T%2i:00'%(hour)
+                    print '%s\t %f\t %f\t %f\t %s'%(print_date, -depth, sum(Growth[ind]), W[ind], Sdata)
+                    
+                julian=julian+1
+    
+                if julian >=julianFileB:
+                    #print 'reset time julian',julianFileA,julian,julianFileB   
+                    julianIndex=julianIndex+1
+                    julianFileA=grdSTATION.time[julianIndex]+grdSTATION.jdref
+                    julianFileB=grdSTATION.time[julianIndex+1]+grdSTATION.jdref
+                   
+                    
                 #  Resetting values for larvae.
-                for i in range(Nlarva):
-                    W[:]    = 0.093 # milligram (5mm larvae)
-                    W_AF[i] = 0.093
-                    S[i]    = 0.3*0.06*W[i] # 30% av max mageinnhold
-                    Age[i] = 0
+                #for i in range(Nlarva):
+                #    W[:]    = 0.093 # milligram (5mm larvae)
+                #    W_AF[i] = 0.093
+                #    S[i]    = 0.3*0.06*W[i] # 30% av max mageinnhold
+                #    Age[i] = 0
                 #print '\n------day %i ------------------------'%(day)
                 #print 'Survival prob: %10.10f '%(Psurvive[ind])
                 #print 'Larvae at depth : %s'%(depth)
                 #print 'Weight %f and length %f of individual %i '%(W[ind], L[ind], ind)
                 #print 'Growth rate %f'%(sum(Growth[ind,:]))
                                                                  
-                     
+                hour=0
+                
 if __name__=="__main__":
     ibm()
   
