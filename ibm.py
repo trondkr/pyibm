@@ -235,7 +235,7 @@ def ibm():
     
     
     # Initialize Calanus
-    calanus_D  = [0.0, 50.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
+    calanus_D  = [0.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
     calanus_W  = [0.33, 0.49, 1., 1.51,2.09, 2.76, 4.18, 13.24, 23.13, 63.64, 169.58, 276.29, 276.29] #(micrograms)
     calanus_L1 = [0.22, 0.27, 0.4, 0.48, 0.55, 0.61, 0.79, 1.08, 1.38, 1.8, 2.43, 2.11, 2.11] #(length in mm)
     calanus_L2 = [0.1, 0.1, 0.1, 0.15,  0.18, 0.2, 0.22, 0.25, 0.31, 0.41, 0.52, 0.65, 0.65] #(width in mm)
@@ -256,15 +256,13 @@ def ibm():
                     L[ind] = np.exp(2.296 + 0.277*np.log(W[ind]) - 0.005128*np.log(W[ind])**2)
                     
                     currentDate=IOtime.julian_to_date(julian, hour)
-                 
-                    julian      = IOtime.julian_day(currentDate[0],currentDate[1],currentDate[2],hour)
+                    julian     =IOtime.julian_day(currentDate[0],currentDate[1],currentDate[2],hour)
                     
-                    """
-                    Calculate weights to use on input data from file"""
+                    """Calculate weights to use on input data from file"""
                     dwA = abs(julian) - abs(julianFileA)
                     dwB = abs(julianFileB) - abs(julian)
                     
-                    s_light = IOlight.surface_light(2440000,grdSTATION.lat,hour);
+                    s_light = IOlight.surface_light(julian,grdSTATION.lat,hour);
                    
                     Eb = s_light*np.exp(attenuation_coeff*(-depth));
                    
