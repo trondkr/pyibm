@@ -10,7 +10,7 @@ __modified__ = datetime.datetime(2009, 6, 4)
 __version__  = "1.2"
 __status__   = "Production"
 
-def getStationData(cdf, varlist, grdSTATION, log):
+def getStationData(cdf, varlist, grdSTATION, log, clim):
     """
     This routine reads a netCDF4 file created using IOstation.py in soda2roms. Such
     a file only contain information for one lat/long location and is therefore different
@@ -21,8 +21,11 @@ def getStationData(cdf, varlist, grdSTATION, log):
     var_array_raw=np.zeros((t, int(len(grdSTATION.depth)), Nvars),dtype=np.float64)
     var_number=0
     
-    grdSTATION.time=cdf.variables['time'][grdSTATION.startIndex:grdSTATION.endIndex]
-
+    if clim is False:
+        grdSTATION.time=cdf.variables['time'][grdSTATION.startIndex:grdSTATION.endIndex]
+    else:
+        grdSTATION.time=(cdf.variables['clim_time'][grdSTATION.startIndex:grdSTATION.endIndex])*5
+        
     for var in varlist:
         print var_array_raw.shape
         var_array_raw[:,:,var_number] = cdf.variables[var][grdSTATION.startIndex:grdSTATION.endIndex,:]

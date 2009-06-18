@@ -44,11 +44,13 @@ def init():
     init: initializes the reading of files and definition of global variables
     """
     log       = True
-    fileNameIn  = "/Users/trond/Projects/arcwarm/SODA/soda2roms/station_lat_41.5423_lon_-66.5233.xyz"
+    clim      = True
+    
+    fileNameIn  = "/Users/trond/Projects/arcwarm/SODA/soda2roms/station_lat_41.5423_lon_-132.9234.nc"
     
     varlist=['temp','salt','u','v'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
-    startDate='1/5/1991'
-    endDate='1/10/1991'
+    startDate='15/1/1991'
+    endDate='15/7/1991'
     
     """
     Open the netcdf file if it existst.
@@ -59,28 +61,23 @@ def init():
     at sigma layers. To be able to convert from sigma to meters we use this function.
     """
     grdSTATION = grd.grdClass(fileNameIn,"STATION")
-    #IOverticalGrid.get_z_levels(grdSTATION)
 
     """
     Get the time information and find the indices for start and stop data to extract relative to
     the time period wanted. Takes input data:
     startDate="DD/MM/YYYY" and endDate="DD/MM/YYYY" or if none given, finds all date
     """
-    getTimeIndices(cdf,grdSTATION,startDate,endDate)
+    getTimeIndices(cdf,grdSTATION,startDate,endDate,clim)
     
     """
     Extract the variables at the given station and store in the grdSTATION object
     """
-    IOnetcdf.getStationData(cdf,varlist,grdSTATION,log)
+    IOnetcdf.getStationData(cdf,varlist,grdSTATION,log,clim)
     
-    return grdSTATION
+    return grdSTATION, clim
 
-def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None):
-    """Get start and stop time stamps from file"""
-    startJDFile =int(grdSTATION.time[0])
-    endJDFile   =int(grdSTATION.time[-1])
-    """
-    Create a date object to keep track of Julian dates etc.
+def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None,clim=None):
+    """Create a date object to keep track of Julian dates etc.
     Also create a reference date starting at 1948/01/01.
     Go here to check results:http://lena.gsfc.nasa.gov/lenaDEV/html/doy_conv.html
     """
@@ -90,86 +87,135 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None):
     ref_date.year=1948
     jdref=ref_date.ToJDNumber()
     grdSTATION.jdref=jdref
-    
-    """Figure out the date from the JD number. I have consistently used JD numbers
-    relative to 01/01/1948 and you therefore have to add that jdref number
-    to calculate the correct date using the date module."""
- 
-    startDateFile=date.DateFromJDNumber(startJDFile+jdref)
-    endDateFile=date.DateFromJDNumber(endJDFile+jdref)
-   
-    print "\nStation contains data for the time period:"
-    print "%s to %s"%(startDateFile, endDateFile)
-    
-    """Now find the Juian dates of the time period you have asked for and see
-    if it exists in the file. If so, the find the indices that correspond to the
-    time period.
-    """
-
-    d = string.split(startDate,'/')
-    start_date = date.Date()
-    start_date.day=int(d[0])
-    start_date.month=int(d[1])
-    start_date.year=int(d[2])
-    jdstart=start_date.ToJDNumber()
-    
-    d = string.split(endDate,'/')
-    end_date = date.Date()
-    end_date.day=int(d[0])
-    end_date.month=int(d[1])
-    end_date.year=int(d[2])
-    jdend=end_date.ToJDNumber()
-    
-    if jdstart < startJDFile+jdref:
-        print "Start time preceeds the earliest time stamp found in file"
-        print "Required in File: %i/%i/%i"%(int(end_date.day),int(end_date.month),int(end_date.year))
-        print "Actually in File: %i/%i/%i"%(int(endDateFile.day),int(endDateFile.month),int(endDateFile.year))
-        exit()
         
-    if jdend > endJDFile+jdref:
-        print "End time proceeds the latest time stamp found in file"
-        print "Required in File: %i/%i/%i"%(int(start_date.day),int(start_date.month),int(start_date.year))
-        print "Actually in File: %i/%i/%i"%(int(startDateFile.day),int(startDateFile.month),int(startDateFile.year))
-        exit()
+    if clim is False:
+        """Get start and stop time stamps from file"""
+        startJDFile =int(grdSTATION.time[0])
+        endJDFile   =int(grdSTATION.time[-1])
         
-    if jdend < endJDFile+jdref and jdstart > startJDFile+jdref:
-        print "Time period to extract was found within the time period available in the file..."
-        print "--> %s - %s"%(startDate,endDate)
+        """Figure out the date from the JD number. I have consistently used JD numbers
+        relative to 01/01/1948 and you therefore have to add that jdref number
+        to calculate the correct date using the date module."""
+     
+        startDateFile=date.DateFromJDNumber(startJDFile+jdref)
+        endDateFile=date.DateFromJDNumber(endJDFile+jdref)
+       
+        print "\nStation contains data for the time period:"
+        print "%s to %s"%(startDateFile, endDateFile)
+        
+        """Now find the Juian dates of the time period you have asked for and see
+        if it exists in the file. If so, the find the indices that correspond to the
+        time period.
+        """
+    
+        d = string.split(startDate,'/')
+        start_date = date.Date()
+        start_date.day=int(d[0])
+        start_date.month=int(d[1])
+        start_date.year=int(d[2])
+        jdstart=start_date.ToJDNumber()
+        
+        d = string.split(endDate,'/')
+        end_date = date.Date()
+        end_date.day=int(d[0])
+        end_date.month=int(d[1])
+        end_date.year=int(d[2])
+        jdend=end_date.ToJDNumber()
+        
+        if jdstart < startJDFile+jdref:
+            print "Start time preceeds the earliest time stamp found in file"
+            print "Required in File: %i/%i/%i"%(int(end_date.day),int(end_date.month),int(end_date.year))
+            print "Actually in File: %i/%i/%i"%(int(endDateFile.day),int(endDateFile.month),int(endDateFile.year))
+            exit()
+            
+        if jdend > endJDFile+jdref:
+            print "End time proceeds the latest time stamp found in file"
+            print "Required in File: %i/%i/%i"%(int(start_date.day),int(start_date.month),int(start_date.year))
+            print "Actually in File: %i/%i/%i"%(int(startDateFile.day),int(startDateFile.month),int(startDateFile.year))
+            exit()
+            
+        if jdend < endJDFile+jdref and jdstart > startJDFile+jdref:
+            print "Time period to extract was found within the time period available in the file..."
+            print "--> %s - %s"%(startDate,endDate)
+            
+            for i in range(grdSTATION.time.shape[0]):
+                if grdSTATION.time[i] +jdref < jdstart:
+                    FOUND=False
+                    continue
+                elif grdSTATION.time[i] + jdref >= jdstart and FOUND is False:
+                    print "\nFound first time index that fits start point:"
+                    print "%s at index %i => %s"%(grdSTATION.time[i]+jdref,i,jdstart)
+                    grdSTATION.startIndex=i-1
+                    grdSTATION.start_date = date.Date()
+                    grdSTATION.start_date =date.DateFromJDNumber(jdstart)
+                    FOUND=True
+            for i in range(grdSTATION.time.shape[0]):
+                if grdSTATION.time[i] +jdref < jdend:
+                    FOUND=False
+                    continue
+                elif grdSTATION.time[i] + jdref >= jdend and FOUND is False:
+                    print "Found first time index that fits end point:"
+                    print "%s at index %i => %s\n"%(grdSTATION.time[i]+jdref,i,jdend)
+                    grdSTATION.endIndex=i
+                    grdSTATION.end_date = date.Date()
+                    grdSTATION.end_date =date.DateFromJDNumber(jdend)
+                    
+        
+                    FOUND=True
+        print "Total number of days extracted: %s"%(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
+        grdSTATION.totalDays=(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
+    else:
+        print "Using climatological time as clim is set to True"
+        d = string.split(startDate,'/')
+        start_date = date.Date()
+        start_date.day=int(d[0])
+        start_date.month=int(d[1])
+        start_date.year=int(d[2])
+        jdstart=start_date.GetYearDay()
+        
+        d = string.split(endDate,'/')
+        end_date = date.Date()
+        end_date.day=int(d[0])
+        end_date.month=int(d[1])
+        end_date.year=int(d[2])
+        jdend=end_date.GetYearDay()
+        
+        grdSTATION.time=[]
+        grdSTATION.time=(cdf.variables["clim_time"][:])*5
+        FOUND = False
         
         for i in range(grdSTATION.time.shape[0]):
-            if grdSTATION.time[i] +jdref < jdstart:
-                FOUND=False
+           
+            if grdSTATION.time[i]  < jdstart:
                 continue
-            elif grdSTATION.time[i] + jdref >= jdstart and FOUND is False:
+            elif grdSTATION.time[i]  >= jdstart and FOUND is False:
                 print "\nFound first time index that fits start point:"
-                print "%s at index %i => %s"%(grdSTATION.time[i]+jdref,i,jdstart)
+                print "%s at index %i => %s"%(grdSTATION.time[i],i,jdstart)
                 grdSTATION.startIndex=i-1
                 grdSTATION.start_date = date.Date()
-                grdSTATION.start_date =date.DateFromJDNumber(jdstart)
+                grdSTATION.start_date =date.DateFromJDNumber(jdstart)        
                 FOUND=True
         for i in range(grdSTATION.time.shape[0]):
-            if grdSTATION.time[i] +jdref < jdend:
+            if grdSTATION.time[i] < jdend:
                 FOUND=False
                 continue
-            elif grdSTATION.time[i] + jdref >= jdend and FOUND is False:
+            elif grdSTATION.time[i]  >= jdend and FOUND is False:
                 print "Found first time index that fits end point:"
-                print "%s at index %i => %s\n"%(grdSTATION.time[i]+jdref,i,jdend)
+                print "%s at index %i => %s\n"%(grdSTATION.time[i],i,jdend)
                 grdSTATION.endIndex=i
                 grdSTATION.end_date = date.Date()
                 grdSTATION.end_date =date.DateFromJDNumber(jdend)
-                
-    
                 FOUND=True
-    print "Total number of days extracted: %s"%(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
-    grdSTATION.totalDays=(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
-    
+        print "Total number of days extracted: %s"%(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
+        grdSTATION.totalDays=(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
+        
 def ibm():
     
     os.system("clear")
     """
     Read the netcdf file and create the input arrays needed by the ibm
     """
-    grdSTATION = init()
+    grdSTATION, clim = init()
     
     """
     Define global variables
@@ -212,6 +258,10 @@ def ibm():
     julian=time.ToJDNumber()
     julianFileA=grdSTATION.time[0]+grdSTATION.jdref
     julianFileB=grdSTATION.time[1]+grdSTATION.jdref
+    
+    if clim is True:
+        julianFileA=grdSTATION.time[0]
+        julianFileB=grdSTATION.time[1]
     julianIndex=0
     
     """
@@ -328,16 +378,19 @@ def ibm():
                     else:
                         print_dd=str(currentDate[2])
                     print_date=str(currentDate[0])+'-'+print_mm+'-'+str(print_dd)+'T%2i:00'%(hour)
-                    print '%s\t %f\t %f\t %f\t %s'%(print_date, -depth, sum(Growth[ind]), W[ind], Sdata)
+                    print '%s\t %f\t %f\t %f\t %s\t %s'%(print_date, -depth, sum(Growth[ind]), W[ind], Sdata, Tdata)
                     
                 julian=julian+1
     
                 if julian >=julianFileB:
                     #print 'reset time julian',julianFileA,julian,julianFileB   
                     julianIndex=julianIndex+1
-                    julianFileA=grdSTATION.time[julianIndex]+grdSTATION.jdref
-                    julianFileB=grdSTATION.time[julianIndex+1]+grdSTATION.jdref
-                   
+                    if clim is False:
+                        julianFileA=grdSTATION.time[julianIndex]+grdSTATION.jdref
+                        julianFileB=grdSTATION.time[julianIndex+1]+grdSTATION.jdref
+                    else:
+                        julianFileA=grdSTATION.time[julianIndex]
+                        julianFileB=grdSTATION.time[julianIndex+1]
                     
                 #  Resetting values for larvae.
                 #for i in range(Nlarva):
