@@ -6,7 +6,7 @@ import numpy as np
 __author__   = 'Trond Kristiansen'
 __email__    = 'trond.kristiansen@imr.no'
 __created__  = datetime.datetime(2008, 6, 10)
-__modified__ = datetime.datetime(2009, 6, 4)
+__modified__ = datetime.datetime(2009, 6, 19)
 __version__  = "1.2"
 __status__   = "Production"
 
