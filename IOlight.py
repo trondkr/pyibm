@@ -12,17 +12,17 @@ Trond.Kristiansen@imr.no
 Functions in module:
 
 1. [umol s-1 m-2]=isurface_light(julian, Lat, hour)
-2. [mm]=get_perception_distance(k,Ke,Ap,Eb)
+2. [mm]=getPerceptionDistance(k,Ke,Ap,Eb)
 
 """  
 __author__   = 'Trond Kristiansen'
 __email__    = 'trond.kristiansen@imr.no'
 __created__  = datetime.datetime(2008, 6, 10)
-__modified__ = datetime.datetime(2008, 6, 10)
+__modified__ = datetime.datetime(2009, 7, 19)
 __version__  = "1.1"
 __status__   = "Production"
 
-def surface_light(julian, Lat, hour):
+def surfaceLight(julian, Lat, hour):
     
     """
     Max light at sea surface
@@ -73,7 +73,7 @@ def surface_light(julian, Lat, hour):
         
     return s_light
     
-def get_perception_distance(k,Ke,Ap,Eb):
+def getPerceptionDistance(k,Ke,Ap,Eb):
     """
     Converted getr.f90 from Fortran to python. Based on Dag Aksnes formula for
     iterating over perception distance.
@@ -85,16 +85,16 @@ def get_perception_distance(k,Ke,Ap,Eb):
     mm2m = 0.001
     Vc = 10000 #Size-specific sensitivity of the visual system (Fiksen,02)
     
-    #Initial guess of visual range (RST)
+    """Initial guess of visual range (RST)"""
     R2= abs(C0)*Ap*Vc*(Eb/(Ke+Eb))
     RST = math.sqrt(R2)
     
-    #Upper boundary of allowed error of visual range
+    """Upper boundary of allowed error of visual range"""
     EPS = .0000001
-    #Maximum number of iteration steps
+    """Maximum number of iteration steps"""
     IEND = 100
     
-    #Prepare iteration
+    """Prepare iteration"""
     r = RST
     TOL = r
     FR2=math.log(abs(C0)*Ap*Vc)
@@ -136,7 +136,7 @@ def get_perception_distance(k,Ke,Ap,Eb):
         else: # if: 1
             break
         
-    return r/mm2m # returns mm
+    return r # returns m
         
 
     
