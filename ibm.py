@@ -23,6 +23,7 @@ import IOtime
 import IOlight
 import date
 import IOnetcdf
+import predation
 
 __author__   = 'Trond Kristiansen'
 __email__    = 'trond.kristiansen@imr.no'
@@ -239,6 +240,7 @@ def ibm(station):
     f = 0.43                     
     pi = 3.14159265
     mm2m = 0.001
+    m2mm = 1000.
     ltr2mm3 = 1e-6
     micro2m = 0.001
     C2 = 0.05                     
@@ -248,13 +250,14 @@ def ibm(station):
     Pe = 0                        
     Ke_larvae = 1
     Ke_predator = 1              
-    attenuation_coeff = 0.18
+    attCoeff = 0.18
     Ndepths=len(grdSTATION.depth)
     Nhours =24
-    Nlarva=50
+    Nlarva=1
     Ndays=int(grdSTATION.totalDays)
     Lat = grdSTATION.lat
-    
+    FishDens = 0.0001	#Predation from fish depends on density of predators
+     
     time=date.Date()
     time.year=grdSTATION.start_date.year
     time.month=grdSTATION.start_date.month
@@ -298,7 +301,8 @@ def ibm(station):
     grdSTATION.saveIndex=(Ndays,Nlarva,Nprey)
     grdSTATION.Ndays=Ndays
     grdSTATION.Nlarva=Nlarva
-    grdSTATION.Nprey=1
+    grdSTATION.Nprey=1.0
+    grdSTATION.larvaPsur=1.0
     
     prey=0
     
@@ -310,11 +314,12 @@ def ibm(station):
 
     
     for i in range(Nlarva):
-        W[:]    = 0.093 # milligram (5mm larvae)
-        W_AF[i] = 0.093
-        S[i]    = 0.3*0.06*W[i] # 30% av max mageinnhold
-        Age[i] = 0
-       
+        W[:]         = 0.093 # milligram (5mm larvae)
+        W_AF[i]      = 0.093
+        S[i]         = 0.3*0.06*W[i] # 30% av max mageinnhold
+        Age[i]       = 0
+        Psurvive[i,:]=0.0
+        
     for day in range(Ndays):
         for ind in range(Nlarva):
             """No behavior, only fixed depth larvae"""
@@ -354,9 +359,9 @@ def ibm(station):
                 dwA = abs(julian) - abs(julianFileA)
                 dwB = abs(julianFileB) - abs(julian)
                 
-                s_light = IOlight.surface_light(julian,grdSTATION.lat,hour);
+                s_light = IOlight.surfaceLight(julian,grdSTATION.lat,hour);
                
-                Eb = s_light*np.exp(attenuation_coeff*(-depth));
+                Eb = s_light*np.exp(attCoeff*(-depth));
                 aveLight=aveLight + Eb
                 """
                 Mouthsize of larvae. The larvae can only capture calanus of sizes less
@@ -400,9 +405,8 @@ def ibm(station):
                
                 for j in range(13):
                     Ap_calanus = 0.75*calanus_L1[j]*mm2m*calanus_L2[j]*mm2m
-                    R[j] = IOlight.get_perception_distance(attenuation_coeff,Ke_larvae,Ap_calanus,Eb)
-                  
-
+                    R[j] = (IOlight.getPerceptionDistance(attCoeff,Ke_larvae,Ap_calanus,Eb))*m2mm
+                   
                 for j in range(13):
                     hand[j] = 0.264*10**(7.0151*(calanus_L1[j]/L[ind])) # Walton 1992
                     enc[j] = (0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * calanus_D[j]* ltr2mm3
@@ -419,10 +423,10 @@ def ibm(station):
                 W_AF[ind] = W_AF[ind] + (np.exp(GR)-1)*W_AF[ind]
          
                 L[ind] = min(L[ind],np.exp(2.296 + 0.277*np.log(W[ind]) - 0.005128*np.log(W[ind])**2))
-                Ap_larvae = 0.1*L[ind]**2*mm2m**2
-                Rpisci = IOlight.get_perception_distance(attenuation_coeff,Ke_predator,Ap_larvae,Eb)
               
-                Psurvive[ind,hour] = np.exp(-a*(L[ind]**b) - C2*(1-Pe)*Rpisci**2)*float(Psurvive[ind,hour])
+                predation.FishPred(FishDens,L[ind]*mm2m,attCoeff,Ke_predator,Eb,dt)
+                #Psurvive[ind,hour] = np.exp(-a*(L[ind]**b) - C2*(1-Pe)*Rpisci**2)
+               
                 """Sum up the total SGR over 24 hours"""
                 Growth[ind, hour]=((W[ind]-W_old)/W_old)*100.0
                 
@@ -443,7 +447,12 @@ def ibm(station):
             
             """Calculate 24 hour SGR """        
             max_g = 1.08 + 1.79 * Tdata - 0.074 * Tdata*np.log(W[ind]) - 0.0965 * Tdata *((np.log(W[ind]))**2) + 0.0112 * Tdata *((np.log(W[ind])**3.))
-          
+            
+            """Calculate 24 hour survival probability"""
+            for s in range(Nhours):
+                grdSTATION.larvaPsur=grdSTATION.larvaPsur*(np.exp(-Psurvive[ind,s]))
+            #print 'Probability of survival at depth : %3.2f => %6.2f'%(depth,grdSTATION.larvaPsur*100.)
+                 
           
             """Store results in grdSTATION object and use that object to write to netCDF4 file"""                  
             grdSTATION.larvaTime=julian
@@ -453,7 +462,6 @@ def ibm(station):
             grdSTATION.larvaSgrAF=max_g
                 
             grdSTATION.larvaAF=W_AF[ind]
-            grdSTATION.larvaPsur=np.exp(-sum(Psurvive[ind,:]))*100.
             grdSTATION.larvaTdata=Tdata
             grdSTATION.larvaAveLight=aveLight/24.0
             
@@ -474,16 +482,16 @@ def ibm(station):
             if julian == grdSTATION.jdend:
                 #print 'Finished running'
                 continue
-            #  Resetting values for larvae.
-           
+            """ Resetting values for all larvae"""
             if ind==(Nlarva-1): 
                 for i in range(Nlarva):
                     W[:]    = 0.093 # milligram (5mm larvae)
                     W_AF[i] = 0.093
                     S[i]    = 0.3*0.06*W[i] # 30% av max mageinnhold
                     Age[i] = 0
-                    Psurvive[i,:]=0.0
-            
+                    Psurvive[i,:]=1.0
+                    grdSTATION.larvaPsur=1.0
+                    
                                                              
             hour=0
         
