@@ -40,8 +40,12 @@ def writeStationFile(grdSTATION,ntime,d,p,outfilename):
         v_time.calendar='standard'
         
         v=f1.createVariable('wgt', 'f', ('time','depth','prey'),zlib=True)
-        v.long_name = "weight at day of year , depth, given prey"
+        v.long_name = "Weight at day of year , depth, given prey"
         v.units = "mg"
+        
+        v=f1.createVariable('length', 'f', ('time','depth','prey'),zlib=True)
+        v.long_name = "Length at day of year , depth, given prey"
+        v.units = "mm"
         
         v=f1.createVariable('sgr', 'f', ('time','depth','prey'),zlib=True)
         v.long_name = "SGR at day of year , depth, given prey"
@@ -63,15 +67,21 @@ def writeStationFile(grdSTATION,ntime,d,p,outfilename):
         v.long_name = "average daily light value at day of year , depth"
         v.units = ""
         
+        v=f1.createVariable('temp', 'f', ('time','depth'),zlib=True)
+        v.long_name = "Temperature"
+        v.units = "degrees Celsius"
+        
      else:
         f1 = Dataset(outfilename, mode='a', format='NETCDF4', zlib=True)
     
      f1.variables['time'][ntime]   = grdSTATION.larvaTime 
      
      f1.variables['wgt'][ntime,d,p]  = grdSTATION.larvaWgt
+     f1.variables['length'][ntime,d,p]  = grdSTATION.larvaLength
      f1.variables['sgr'][ntime,d,p]  = grdSTATION.larvaSgr
      f1.variables['average light'][ntime,d]  = grdSTATION.larvaAveLight
      f1.variables['sgrAF'][ntime,d]  = grdSTATION.larvaSgrAF
+     f1.variables['temp'][ntime,d]  = grdSTATION.larvaTdata
      f1.variables['sgr relative'][ntime,d,p]  = (grdSTATION.larvaSgr/grdSTATION.larvaSgrAF)*100.
      f1.variables['survival probability'][ntime,d,p]  = grdSTATION.larvaPsur
      f1.close()
