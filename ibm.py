@@ -1,7 +1,6 @@
 import os, sys, string
 import netCDF4
-from netCDF4 import Dataset
-from netCDF4 import num2date
+from netCDF4 import num2date, Dataset
 import datetime, types
 import numpy as np
 import IOwrite
@@ -28,7 +27,7 @@ import predation
 __author__   = 'Trond Kristiansen'
 __email__    = 'trond.kristiansen@imr.no'
 __created__  = datetime.datetime(2008, 6, 9)
-__modified__ = datetime.datetime(2008, 6, 9)
+__modified__ = datetime.datetime(2009, 8, 10)
 __version__  = "1.1.5"
 __status__   = "Production"
 
@@ -46,12 +45,12 @@ def init(station):
     init: initializes the reading of files and definition of global variables
     """
     log       = True
-    clim      = True
-    print 'init',station
+    clim      = False
+    print 'init', station
     fileNameIn  = station
     
     varlist=['temp','salt','u','v'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
-    startDate='15/1/1991'
+    startDate='15/3/1991'
     endDate='15/7/1991'
     
     """
@@ -166,6 +165,8 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None,clim=None):
                     FOUND=True
         print "Total number of days extracted: %s"%(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
         grdSTATION.totalDays=(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
+        grdSTATION.jdend=jdend
+        grdSTATION.jdstart=jdstart        
     else:
         print "Using climatological time as clim is set to True"
         d = string.split(startDate,'/')
@@ -238,14 +239,14 @@ def ibm(station):
     tau = 2.0                     
     omega = 0.0
     f = 0.43                     
-    pi = 3.14159265
+    pi = np.pi
     mm2m = 0.001
     m2mm = 1000.
     ltr2mm3 = 1e-6
     micro2m = 0.001
     C2 = 0.05                     
     act = 1
-    a = (0.01/3600)*dt;            
+    a = (0.01/3600.)*dt;            
     b = -1.3 
     Pe = 0                        
     Ke_larvae = 1
@@ -253,7 +254,7 @@ def ibm(station):
     attCoeff = 0.18
     Ndepths=len(grdSTATION.depth)
     Nhours =24
-    Nlarva=1
+    Nlarva=10
     Ndays=int(grdSTATION.totalDays)
     Lat = grdSTATION.lat
     FishDens = 0.0001	#Predation from fish depends on density of predators
@@ -318,7 +319,7 @@ def ibm(station):
         W_AF[i]      = 0.093
         S[i]         = 0.3*0.06*W[i] # 30% av max mageinnhold
         Age[i]       = 0
-        Psurvive[i,:]=0.0
+        Psurvive[i,:]= 0.0
         
     for day in range(Ndays):
         for ind in range(Nlarva):
@@ -355,18 +356,13 @@ def ibm(station):
                 currentDate=IOtime.julian_to_date(julian, hour)
                 julian     =IOtime.julian_day(currentDate[0],currentDate[1],currentDate[2],hour)
                 
-                """Calculate weights to use on input data from file"""
-                dwA = abs(julian) - abs(julianFileA)
-                dwB = abs(julianFileB) - abs(julian)
-                
                 s_light = IOlight.surfaceLight(julian,grdSTATION.lat,hour);
-               
+                
                 Eb = s_light*np.exp(attCoeff*(-depth));
                 aveLight=aveLight + Eb
-                """
-                Mouthsize of larvae. The larvae can only capture calanus of sizes less
-                than the larval mouthsize. Folkvord et al.
-                """
+                #print ind,day,hour,Eb,L[ind]
+                """Mouthsize of larvae. The larvae can only capture calanus of sizes less
+                than the larval mouthsize. Folkvord et al."""
                 m = np.exp (-3.27+1.818*np.log(L[ind])-0.1219*(np.log(L[ind]))**2.)
                 
                 meta = dt*2.38e-7*np.exp(0.088*7)*((W[ind]*1000)**(0.9)*0.001)
@@ -375,6 +371,9 @@ def ibm(station):
                         meta = (2.5*meta)
                     else:
                         meta = (1.4*meta);
+                """Calculate weights to use on input data from file"""
+                dwA = abs(julian) - abs(julianFileA)
+                dwB = abs(julianFileB) - abs(julian)
                 """Interpolate the values of temp, salt, u and v velocity in time to current julian date"""
                 Tdata=((grdSTATION.data[julianIndex,depthIndex1,0])*
                     (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,0])*
@@ -423,7 +422,7 @@ def ibm(station):
                 W_AF[ind] = W_AF[ind] + (np.exp(GR)-1)*W_AF[ind]
          
                 L[ind] = min(L[ind],np.exp(2.296 + 0.277*np.log(W[ind]) - 0.005128*np.log(W[ind])**2))
-              
+                print hour, Tdata,depthIndex1,depthIndex2,grdSTATION.depth[depthIndex1],grdSTATION.depth[depthIndex2], ind
                 predation.FishPred(FishDens,L[ind]*mm2m,attCoeff,Ke_predator,Eb,dt)
                 #Psurvive[ind,hour] = np.exp(-a*(L[ind]**b) - C2*(1-Pe)*Rpisci**2)
                
@@ -453,12 +452,13 @@ def ibm(station):
                 grdSTATION.larvaPsur=grdSTATION.larvaPsur*(np.exp(-Psurvive[ind,s]))
             #print 'Probability of survival at depth : %3.2f => %6.2f'%(depth,grdSTATION.larvaPsur*100.)
                  
-          
+           # print ind, sum(Growth[ind,:]),W[ind],
             """Store results in grdSTATION object and use that object to write to netCDF4 file"""                  
             grdSTATION.larvaTime=julian
             grdSTATION.larvaDepth=-depth
             grdSTATION.larvaWgt=W[ind]
-            grdSTATION.larvaSgr=sum(Growth[ind])
+            grdSTATION.larvaLength=L[ind]
+            grdSTATION.larvaSgr=sum(Growth[ind,:])
             grdSTATION.larvaSgrAF=max_g
                 
             grdSTATION.larvaAF=W_AF[ind]
@@ -485,18 +485,19 @@ def ibm(station):
             """ Resetting values for all larvae"""
             if ind==(Nlarva-1): 
                 for i in range(Nlarva):
-                    W[:]    = 0.093 # milligram (5mm larvae)
+                    W[i]    = 0.093 # milligram (5mm larvae)
                     W_AF[i] = 0.093
                     S[i]    = 0.3*0.06*W[i] # 30% av max mageinnhold
                     Age[i] = 0
                     Psurvive[i,:]=1.0
+                    Growth[i,:]=0.0
                     grdSTATION.larvaPsur=1.0
                     
                                                              
             hour=0
         
 if __name__=="__main__":
-    import psyco
+   
     try:
         import psyco
         psyco.log()
@@ -506,12 +507,12 @@ if __name__=="__main__":
     except ImportError:
         pass
     
-    stations=["/Users/trond/Projects/arcwarm/SODA/soda2roms/station_lat_41.5423_lon_-132.9234.nc",
-              "/Users/trond/Projects/arcwarm/SODA/soda2roms/station_lat_43.4111_lon_-50.4321.nc",
-              "/Users/trond/Projects/arcwarm/SODA/soda2roms/station_lat_44.5001_lon_-54.3801.nc",
-              "/Users/trond/Projects/arcwarm/SODA/soda2roms/station_lat_63.3501_lon_1.5301.nc",
-              "/Users/trond/Projects/arcwarm/SODA/soda2roms/station_lat_64.7201_lon_21.5101.nc"]
-    #stations=["/Users/trond/Projects/arcwarm/SODA/soda2roms/station_lat_63.3501_lon_1.5301.nc"]
+    stations=["/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_EastandWestGreenland.nc",
+              "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_GeorgesBank.nc",
+              "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_lofoten.nc",
+              "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_NorthSea.nc",
+              "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_Iceland.nc"]
+    stations=["/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_GeorgesBank.nc"]
 
     
     for station in stations:
