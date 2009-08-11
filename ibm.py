@@ -1,10 +1,10 @@
 import os, sys, string
 import netCDF4
 from netCDF4 import num2date, Dataset
-import datetime, types
+import types
 import numpy as np
 import IOwrite
-
+import datetime as datetime
 """
 Import modules created as part of project
 """
@@ -50,8 +50,8 @@ def init(station):
     fileNameIn  = station
     
     varlist=['temp','salt','u','v'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
-    startDate='15/3/1991'
-    endDate='15/7/1991'
+    startDate = datetime.datetime(1991,3,12,0,0,0)
+    endDate   = datetime.datetime(1991,7,15,0,0,0)
     
     """
     Open the netcdf file if it existst.
@@ -82,24 +82,21 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None,clim=None):
     Also create a reference date starting at 1948/01/01.
     Go here to check results:http://lena.gsfc.nasa.gov/lenaDEV/html/doy_conv.html
     """
-    ref_date = date.Date()
-    ref_date.day=1
-    ref_date.month=1
-    ref_date.year=1948
-    jdref=ref_date.ToJDNumber()
-    grdSTATION.jdref=jdref
-        
+    refDate    = datetime.datetime(1948,1,1,0,0,0)
+    grdSTATION.refDate = refDate
+    
     if clim is False:
-        """Get start and stop time stamps from file"""
-        startJDFile =int(grdSTATION.time[0])
-        endJDFile   =int(grdSTATION.time[-1])
+        """Get start and stop time stamps from file. The time stamp from SODA is
+        in days so conver to seconds (since 1948,1,1)"""
+        startJDFile =int(grdSTATION.time[0])*86400
+        endJDFile   =int(grdSTATION.time[-1])*86400
         
         """Figure out the date from the JD number. I have consistently used JD numbers
         relative to 01/01/1948 and you therefore have to add that jdref number
         to calculate the correct date using the date module."""
      
-        startDateFile=date.DateFromJDNumber(startJDFile+jdref)
-        endDateFile=date.DateFromJDNumber(endJDFile+jdref)
+        startDateFile = refDate + datetime.timedelta(seconds=startJDFile)
+        endDateFile   = refDate + datetime.timedelta(seconds=endJDFile)
        
         print "\nStation contains data for the time period:"
         print "%s to %s"%(startDateFile, endDateFile)
@@ -108,65 +105,53 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None,clim=None):
         if it exists in the file. If so, the find the indices that correspond to the
         time period.
         """
+        JDstart = startDate - refDate
+        JDstart = JDstart.days*86400 + JDstart.seconds
+        
+        JDend   = endDate - refDate
+        JDend   = JDend.days*86400 + JDend.seconds
     
-        d = string.split(startDate,'/')
-        start_date = date.Date()
-        start_date.day=int(d[0])
-        start_date.month=int(d[1])
-        start_date.year=int(d[2])
-        jdstart=start_date.ToJDNumber()
-        
-        d = string.split(endDate,'/')
-        end_date = date.Date()
-        end_date.day=int(d[0])
-        end_date.month=int(d[1])
-        end_date.year=int(d[2])
-        jdend=end_date.ToJDNumber()
-        
-        if jdstart < startJDFile+jdref:
+        if JDstart < startJDFile:
             print "Start time preceeds the earliest time stamp found in file"
-            print "Required in File: %i/%i/%i"%(int(end_date.day),int(end_date.month),int(end_date.year))
-            print "Actually in File: %i/%i/%i"%(int(endDateFile.day),int(endDateFile.month),int(endDateFile.year))
+            print "Required in File: %s"%(refDate + datetime.timedelta(seconds=JDstart))
+            print "Actually in File: %is"%(refDate + datetime.timedelta(seconds=startJDFile))
             exit()
             
-        if jdend > endJDFile+jdref:
-            print "End time proceeds the latest time stamp found in file"
-            print "Required in File: %i/%i/%i"%(int(start_date.day),int(start_date.month),int(start_date.year))
-            print "Actually in File: %i/%i/%i"%(int(startDateFile.day),int(startDateFile.month),int(startDateFile.year))
+        if JDend > endJDFile:
+            print "End time exceeds the last time stamp found in file"
+            print "Required in File: %s"%(refDate + datetime.timedelta(seconds=JDend))
+            print "Actually in File: %is"%(refDate + datetime.timedelta(seconds=endJDFile))
             exit()
             
-        if jdend < endJDFile+jdref and jdstart > startJDFile+jdref:
+        if JDend < endJDFile and JDstart > startJDFile:
             print "Time period to extract was found within the time period available in the file..."
             print "--> %s - %s"%(startDate,endDate)
             
             for i in range(grdSTATION.time.shape[0]):
-                if grdSTATION.time[i] +jdref < jdstart:
+                if grdSTATION.time[i]*86400  < JDstart:
                     FOUND=False
                     continue
-                elif grdSTATION.time[i] + jdref >= jdstart and FOUND is False:
+                elif grdSTATION.time[i]*86400  >= JDstart and FOUND is False:
                     print "\nFound first time index that fits start point:"
-                    print "%s at index %i => %s"%(grdSTATION.time[i]+jdref,i,jdstart)
+                    print "%s at index %i => %s"%(refDate + datetime.timedelta(seconds=grdSTATION.time[i]*86400),i,JDstart)
                     grdSTATION.startIndex=i-1
-                    grdSTATION.start_date = date.Date()
-                    grdSTATION.start_date =date.DateFromJDNumber(jdstart)
+                    grdSTATION.start_date = refDate + datetime.timedelta(seconds=grdSTATION.time[i]*86400)
                     FOUND=True
             for i in range(grdSTATION.time.shape[0]):
-                if grdSTATION.time[i] +jdref < jdend:
+                if grdSTATION.time[i]*86400 < JDend:
                     FOUND=False
                     continue
-                elif grdSTATION.time[i] + jdref >= jdend and FOUND is False:
+                elif grdSTATION.time[i]*86400 >= JDend and FOUND is False:
                     print "Found first time index that fits end point:"
-                    print "%s at index %i => %s\n"%(grdSTATION.time[i]+jdref,i,jdend)
+                    print "%s at index %i => %s\n"%(refDate + datetime.timedelta(seconds=grdSTATION.time[i]*86400),i,JDend)
                     grdSTATION.endIndex=i+1
-                    grdSTATION.end_date = date.Date()
-                    grdSTATION.end_date =date.DateFromJDNumber(jdend)
-                    
-        
+                    grdSTATION.end_date = refDate + datetime.timedelta(seconds=grdSTATION.time[i]*86400)
                     FOUND=True
         print "Total number of days extracted: %s"%(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
         grdSTATION.totalDays=(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
-        grdSTATION.jdend=jdend
-        grdSTATION.jdstart=jdstart        
+        grdSTATION.JDend=JDend
+        grdSTATION.JDstart=JDstart
+        
     else:
         print "Using climatological time as clim is set to True"
         d = string.split(startDate,'/')
@@ -215,9 +200,40 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None,clim=None):
         print "Total number of days extracted: %s"%(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
         grdSTATION.totalDays=(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
         
+def updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim):
+    """This routine makes sure that we are reading at the correct time indices
+    in the input data. If we have moved forward in time enough to move past the current time window of two
+    time stamps, then update the indices and give the new indices"""
+   
+    if julian >=julianFileB and julian < grdSTATION.JDend:
+        print 'reset time julian',julianFileA,julian,julianFileB  ,  grdSTATION.JDend
+        julianIndex=julianIndex+1
+    if clim is False:
+        julianFileA=grdSTATION.time[julianIndex]*86400
+        julianFileB=grdSTATION.time[julianIndex+1]*86400
+    else:
+        julianFileA=grdSTATION.time[julianIndex]
+        julianFileB=grdSTATION.time[julianIndex+1]
+   
+    return julianFileA, julianFileB, julianIndex
+
+def storeObject(grdSTATION,ind,julian,depth,W,L,Growth,max_g,Tdata,W_AF,aveLight):
+    
+    grdSTATION.larvaTime=julian
+    grdSTATION.larvaDepth=-depth
+    grdSTATION.larvaWgt=W[ind]
+    grdSTATION.larvaLength=L[ind]
+    grdSTATION.larvaSgr=sum(Growth[ind,:])
+    grdSTATION.larvaSgrAF=max_g    
+    grdSTATION.larvaAF=W_AF[ind]
+    grdSTATION.larvaTdata=Tdata
+    grdSTATION.larvaAveLight=aveLight/24.0
+    
+    return grdSTATION
+
 def ibm(station):
     
-    os.system("clear")
+    #os.system("clear")
     """
     Read the netcdf file and create the input arrays needed by the ibm
     """
@@ -226,7 +242,7 @@ def ibm(station):
     """
     Open output file:
     """
-    outputfile=str(grdSTATION.lat[0])+'_'+str(grdSTATION.lon[0])+'_res.nc'
+    outputfile=str(station)+'_res.nc'
     if os.path.exists(outputfile): os.remove(outputfile)
 
     """
@@ -254,25 +270,23 @@ def ibm(station):
     attCoeff = 0.18
     Ndepths=len(grdSTATION.depth)
     Nhours =24
-    Nlarva=10
+    Nlarva=1
     Ndays=int(grdSTATION.totalDays)
     Lat = grdSTATION.lat
     FishDens = 0.0001	#Predation from fish depends on density of predators
      
-    time=date.Date()
-    time.year=grdSTATION.start_date.year
-    time.month=grdSTATION.start_date.month
-    time.day=grdSTATION.start_date.day
+    time=grdSTATION.start_date - grdSTATION.refDate 
+    print grdSTATION.start_date
     
     """ julian is the time used to control the larvae, while
     julianFileA and julianFileB are the time stamps of inbetween
     the larvae recides relative to time from file. Temperature is
     interpolated to date julian from julianFileA and julianFileB"""
     
-    julian=time.ToJDNumber()
-    julianFileA=grdSTATION.time[0]+grdSTATION.jdref
-    julianFileB=grdSTATION.time[1]+grdSTATION.jdref
-    
+    julian=time.days*86400 + time.seconds
+    julianFileA=grdSTATION.time[0]*86400
+    julianFileB=grdSTATION.time[1]*86400
+   
     if clim is True:
         julianFileA=grdSTATION.time[0]
         julianFileB=grdSTATION.time[1]
@@ -350,12 +364,11 @@ def ibm(station):
             # count on Nsteps instead of Nhours, where Nsteps*dt=Nhours.
             
             aveLight=0.0
+            oldJulian=julian
             for hour in range(Nhours):
+                
                 L[ind] = np.exp(2.296 + 0.277*np.log(W[ind]) - 0.005128*np.log(W[ind])**2)
-                
-                currentDate=IOtime.julian_to_date(julian, hour)
-                julian     =IOtime.julian_day(currentDate[0],currentDate[1],currentDate[2],hour)
-                
+               
                 s_light = IOlight.surfaceLight(julian,grdSTATION.lat,hour);
                 
                 Eb = s_light*np.exp(attCoeff*(-depth));
@@ -422,27 +435,24 @@ def ibm(station):
                 W_AF[ind] = W_AF[ind] + (np.exp(GR)-1)*W_AF[ind]
          
                 L[ind] = min(L[ind],np.exp(2.296 + 0.277*np.log(W[ind]) - 0.005128*np.log(W[ind])**2))
-                print hour, Tdata,depthIndex1,depthIndex2,grdSTATION.depth[depthIndex1],grdSTATION.depth[depthIndex2], ind
+               
                 predation.FishPred(FishDens,L[ind]*mm2m,attCoeff,Ke_predator,Eb,dt)
                 #Psurvive[ind,hour] = np.exp(-a*(L[ind]**b) - C2*(1-Pe)*Rpisci**2)
                
                 """Sum up the total SGR over 24 hours"""
                 Growth[ind, hour]=((W[ind]-W_old)/W_old)*100.0
                 
-                
-            if depth <= Nlarva-1:
-                if currentDate[1]<10:
-                    print_mm='0'+str(currentDate[1])
-                else:
-                    print_mm=str(currentDate[1])
-                if time.day<10:
-                    print_dd='0'+str(currentDate[2])
-                else:
-                    print_dd=str(currentDate[2])
-                if clim is False:   
-                    print_date=str(currentDate[0])+'-'+print_mm+'-'+str(print_dd)+'T%2i:00'%(hour)
-                else:
-                    print_date='CLIM-'+print_mm+'-'+str(print_dd)+'T%2i:00'%(hour)
+                """Update time"""
+                currentDate=grdSTATION.refDate + datetime.timedelta(seconds=julian + dt)
+                delta=currentDate - grdSTATION.refDate 
+                julian=delta.days*86400 + delta.seconds
+            
+            #if depth <= Nlarva-1:
+            #    
+            #    if clim is False:   
+            #        print_date=str(currentDate[0])+'-'+print_mm+'-'+str(print_dd)+'T%2i:00'%(hour)
+            #    else:
+            #        print_date='CLIM-'+print_mm+'-'+str(print_dd)+'T%2i:00'%(hour)
             
             """Calculate 24 hour SGR """        
             max_g = 1.08 + 1.79 * Tdata - 0.074 * Tdata*np.log(W[ind]) - 0.0965 * Tdata *((np.log(W[ind]))**2) + 0.0112 * Tdata *((np.log(W[ind])**3.))
@@ -454,34 +464,13 @@ def ibm(station):
                  
            # print ind, sum(Growth[ind,:]),W[ind],
             """Store results in grdSTATION object and use that object to write to netCDF4 file"""                  
-            grdSTATION.larvaTime=julian
-            grdSTATION.larvaDepth=-depth
-            grdSTATION.larvaWgt=W[ind]
-            grdSTATION.larvaLength=L[ind]
-            grdSTATION.larvaSgr=sum(Growth[ind,:])
-            grdSTATION.larvaSgrAF=max_g
-                
-            grdSTATION.larvaAF=W_AF[ind]
-            grdSTATION.larvaTdata=Tdata
-            grdSTATION.larvaAveLight=aveLight/24.0
-            
+            grdSTATION = storeObject(grdSTATION,ind,julian,depth,W,L,Growth,max_g,Tdata,W_AF,aveLight)
+           
             IOwrite.writeStationFile(grdSTATION,day,depth,prey,outputfile)
-                
+            
             if ind==(Nlarva-1): 
-                julian=julian+1
-                print '%3.1f\t %s\t %4.2f'%(grdSTATION.lat, print_date,julian)
-            if julian >=julianFileB and julian < grdSTATION.jdend:
-               # print 'reset time julian',julianFileA,julian,julianFileB  ,  grdSTATION.jdend
-                julianIndex=julianIndex+1
-                if clim is False:
-                    julianFileA=grdSTATION.time[julianIndex]+grdSTATION.jdref
-                    julianFileB=grdSTATION.time[julianIndex+1]+grdSTATION.jdref
-                else:
-                    julianFileA=grdSTATION.time[julianIndex]
-                    julianFileB=grdSTATION.time[julianIndex+1]
-            if julian == grdSTATION.jdend:
-                #print 'Finished running'
-                continue
+                julianFileA, julianFileB,julianIndex = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim)
+            
             """ Resetting values for all larvae"""
             if ind==(Nlarva-1): 
                 for i in range(Nlarva):
@@ -492,8 +481,8 @@ def ibm(station):
                     Psurvive[i,:]=1.0
                     Growth[i,:]=0.0
                     grdSTATION.larvaPsur=1.0
-                    
-                                                             
+            if ind!=(Nlarva-1):       
+                julian=oldJulian                                                    
             hour=0
         
 if __name__=="__main__":
