@@ -1,5 +1,5 @@
 import math, datetime
-
+from initLarva import *
 import IOtime
 
 """
@@ -37,7 +37,7 @@ def surfaceLight(julian, Lat, hour):
     D = float(gtime[2] + sum(days_in_month[0:int(gtime[1])-1]))
     H = float(gtime[3])
     
-    P = math.pi
+    P = pi
     TWLIGHT = 5.76
     
     MAXLIG = MAXLIG * 0.1 + MAXLIG * abs(math.sin(math.pi*(D*1.0)/365.0))
@@ -73,7 +73,7 @@ def surfaceLight(julian, Lat, hour):
         
     return s_light
     
-def getPerceptionDistance(k,Ke,Ap,Eb):
+def getPerceptionDistance(Em,k,Ke,Ap,Eb):
     """
     Converted getr.f90 from Fortran to python. Based on Dag Aksnes formula for
     iterating over perception distance.
@@ -81,12 +81,9 @@ def getPerceptionDistance(k,Ke,Ap,Eb):
     Trond.Kristiansen@imr.no
     """
     c = 3*k
-    C0 = 0.4 #Inherent contrast after Fiksen,02
-    mm2m = 0.001
-    Vc = 10000 #Size-specific sensitivity of the visual system (Fiksen,02)
-    
+
     """Initial guess of visual range (RST)"""
-    R2= abs(C0)*Ap*Vc*(Eb/(Ke+Eb))
+    R2= Em*contrast*Ap*(Eb/(Ke+Eb))
     RST = math.sqrt(R2)
     
     """Upper boundary of allowed error of visual range"""
@@ -97,7 +94,7 @@ def getPerceptionDistance(k,Ke,Ap,Eb):
     """Prepare iteration"""
     r = RST
     TOL = r
-    FR2=math.log(abs(C0)*Ap*Vc)
+    FR2=math.log(abs(contrast)*Ap*Em)
     FR1=math.log(((Ke+Eb)/Eb)*r*r*math.exp(c*r))
     F1 = FR1-FR2
     FDER = c + 2./r 
@@ -110,7 +107,7 @@ def getPerceptionDistance(k,Ke,Ap,Eb):
                 r = r - DX
                 if (r>=0): # if 3
                     TOL = r
-                    FR2=math.log(abs(C0)*Ap*Vc)
+                    FR2=math.log(abs(contrast)*Ap*Em)
                     FR1=math.log(((Ke+Eb)/Eb)*r*r*math.exp(c*r))
                     F1 = FR1-FR2
                     FDER = c + 2./r 
