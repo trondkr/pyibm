@@ -53,7 +53,7 @@ def init(station):
     
     varlist=['temp','salt','u','v'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
     startDate = datetime.datetime(1991,3,12,0,0,0)
-    endDate   = datetime.datetime(1991,7,15,0,0,0)
+    endDate   = datetime.datetime(1991,4,15,0,0,0)
     
     """Open the netcdf file if it existst."""
     cdf = Dataset(fileNameIn)
@@ -75,7 +75,7 @@ def init(station):
     if os.path.exists(outputFile): os.remove(outputFile)
     
     """Number of release dates and cohorts"""
-    NReleaseDates = 2
+    NReleaseDates = 1
     daysBetweenReleases=7
     """Calculate release dates for individual cohorts based on days since start date of simulations."""
     ListOfReleaseDates=[]
@@ -214,8 +214,13 @@ def updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim
     time stamps, then update the indices and give the new indices"""
    
     if julian >=julianFileB and julian < grdSTATION.JDend:
-        print 'reset time julian',julianFileA,julian,julianFileB,  grdSTATION.JDend
+        #print 'reset time julian',julianFileA/3600.,julian/3600.,julianFileB/3600.
         julianIndex=julianIndex+1
+        julianFileA=grdSTATION.time[julianIndex]*86400
+        julianFileB=grdSTATION.time[julianIndex+1]*86400
+       # print 'new  time julian',julianFileA/3600.,julian/3600.,julianFileB/3600.
+       # print "diff to go: ",julianFileB/3600.-julian/3600.
+       # print "\n"
         Finish = False
     elif julian >= grdSTATION.JDend:
         Finish = True
@@ -230,19 +235,6 @@ def updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim
    
     return julianFileA, julianFileB, julianIndex, Finish
 
-def storeObject(cohort,ind,t,prey,grdSTATION,julian,depth,W,L,Growth,max_g,Tdata,W_AF,aveLight):
-    
-    grdSTATION.larvaTime=julian
-    grdSTATION.larvaDepth=-depth
-    grdSTATION.larvaWgt=W[cohort,ind,t,prey]
-    grdSTATION.larvaLength=L[cohort,ind,t,prey]
-    grdSTATION.larvaSgr=sum(Growth[cohort,ind,t-23:t,prey])
-    grdSTATION.larvaSgrAF=max_g    
-    grdSTATION.larvaAF=W_AF[cohort,ind,t,prey]
-    grdSTATION.larvaTdata=Tdata
-    grdSTATION.larvaAveLight=aveLight/24.0
-    
-    return grdSTATION
 
 def ibm(station):
     
@@ -272,6 +264,8 @@ def ibm(station):
     """Create array for each individual larvae"""
    
     W   =np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64)
+    larvaPsur   =np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64)
+    larvaDepth   =np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64)
     W_AF=np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64)
     S   =np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64)
     Age =np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64)
@@ -279,7 +273,8 @@ def ibm(station):
    
     ingrate  =np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64)
     Psurvive =np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64)
-    Growth   =np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64)
+    SGR      =np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64)
+    larvaTdata   =np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64)
    
     R=np.zeros(13,dtype=np.float64)
     enc=np.zeros(13,dtype=np.float64)
@@ -296,16 +291,22 @@ def ibm(station):
     grdSTATION.larvaPsur=1.0
     
     prey=0
-    t=0
+    t=1
     
-    W[:,:,:,:]         = 0.093 # milligram (5mm larvae)
+    print "RANDOM WEIGHT INITIALIZED"
+    W[:,:,:,:]         = 0.093 
+    W[:,:,:,:]         = W+ (W/2.)*np.random.random_sample(W.shape)# milligram (5mm larvae)
     W_AF[:,:,:,:]      = 0.093
     S[:,:,:,:]         = 0.3*0.06*W # 30% av max mageinnhold
-   
-    
+    larvaTime=[]
+    print W[0,:,0,0]
     """==================LOOP STARTS====================="""
     """Loop over all the days of interest"""
     for day in range(Ntime):
+        
+        """Save the julian date and the time index so that you can reset time between each chohort and indiviual you run"""
+        oldJulian=julian
+        oldT=t
         """loop over all the cohorts of interest"""
         for cohort in range(Ncohorts):
             """For each day, and cohort, loop over all the individuals"""
@@ -338,11 +339,10 @@ def ibm(station):
                 # count on Nsteps instead of Nhours, where Nsteps*dt=Nhours.
                 
                 aveLight=0.0
-                oldJulian=julian
-                oldT=t
+                
                 for hour in range(Nhours):
                     
-                    L[cohort,ind,t,prey] = np.exp(2.296 + 0.277*np.log(W[cohort,ind,t,prey]) - 0.005128*np.log(W[cohort,ind,t,prey])**2)
+                    L[cohort,ind,t,prey] = np.exp(2.296 + 0.277*np.log(W[cohort,ind,t-1,prey]) - 0.005128*np.log(W[cohort,ind,t-1,prey])**2)
                    
                     s_light = IOlight.surfaceLight(julian,grdSTATION.lat,hour)
                     
@@ -353,7 +353,7 @@ def ibm(station):
                     than the larval mouthsize. Folkvord et al."""
                     m = np.exp (-3.27+1.818*np.log(L[cohort,ind,t,prey])-0.1219*(np.log(L[cohort,ind,t,prey]))**2.)
                     
-                    meta = dt*2.38e-7*np.exp(0.088*7)*((W[cohort,ind,t,prey]*1000)**(0.9)*0.001)
+                    meta = dt*2.38e-7*np.exp(0.088*7)*((W[cohort,ind,t-1,prey]*1000)**(0.9)*0.001)
                     if Eb > 0.001:
                         if L[cohort,ind,t,prey] > 5.5: meta = (2.5*meta)
                         else: meta = (1.4*meta);
@@ -382,10 +382,11 @@ def ibm(station):
                         (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,3])*
                         (dwB/(dwA+dwB)))*dz2
                     
-                    assi = 0.8*(1.0 - 0.4*np.exp(-0.002*(W[cohort,ind,t,prey]/mm2m-30.0)))
-                    GR = sec2day*np.log(0.01*(1.08 + 1.79*Tdata - 0.074*Tdata*np.log(W[cohort,ind,t,prey])
-                                              - 0.0965*Tdata*np.log(W[cohort,ind,t,prey])**2 + 0.0112*Tdata*np.log(W[cohort,ind,t,prey])**3) + 1)*dt  
-                    GR_gram = (np.exp(GR) - 1)*W[cohort,ind,t,prey]
+                    assi = 0.8*(1.0 - 0.4*np.exp(-0.002*(W[cohort,ind,t-1,prey]/mm2m-30.0)))
+                    GR = sec2day*np.log(0.01*(1.08 + 1.79*Tdata - 0.074*Tdata*np.log(W[cohort,ind,t-1,prey])
+                                              - 0.0965*Tdata*np.log(W[cohort,ind,t-1,prey])**2
+                                              + 0.0112*Tdata*np.log(W[cohort,ind,t-1,prey])**3) + 1)*dt  
+                    GR_gram = (np.exp(GR) - 1)*W[cohort,ind,t-1,prey]
                                    
                     Em = L[cohort,ind,t,prey]**2/(contrast*0.1*0.2*0.75) #Size-specific sensitivity of the visual system (Fiksen,02)
                     for j in range(13):
@@ -398,29 +399,39 @@ def ibm(station):
                         pca[j] = enc[j]*max(0.0,min(1.0,-16.7*(calanus_L1[j]/L[cohort,ind,t,prey]) + 3.0/2.0))
                         ing[j] = dt*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]);
                       
-                    W_old = W[cohort,ind,t,prey]
-                    S_old = S[cohort,ind,t,prey]
-                    S[cohort,ind] = min(gut_size*W[cohort,ind,t,prey],S_old + sum(ing[:]))
-                    ingrate[cohort,ind,t,prey] = (S[cohort,ind,t,prey] - S_old)/W[cohort,ind,t,prey]
-                    W[cohort,ind,t,prey] = W[cohort,ind,t,prey] + min(GR_gram + meta,S[cohort,ind,t,prey]*assi) - meta #- 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta;
-                    S[cohort,ind,t,prey] = S[cohort,ind,t,prey] - ((W[cohort,ind,t,prey] - W_old) + meta)/assi # + 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta)/assi;
+                
+                    S[cohort,ind,t,prey] = min(gut_size*W[cohort,ind,t-1,prey],S[cohort,ind,t-1,prey] + sum(ing[:]))
+                    ingrate[cohort,ind,t,prey] = (S[cohort,ind,t,prey] - S[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey]
+                    W[cohort,ind,t,prey] = W[cohort,ind,t-1,prey] + min(GR_gram + meta,S[cohort,ind,t,prey]*assi) - meta #- 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta;
+                    S[cohort,ind,t,prey] = S[cohort,ind,t,prey] - ((W[cohort,ind,t,prey] - W[cohort,ind,t-1,prey]) + meta)/assi # + 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta)/assi;
                     
-                    W_AF[cohort,ind,t,prey] = W_AF[cohort,ind,t,prey] + (np.exp(GR)-1)*W_AF[cohort,ind,t,prey]
-             
-                    L[cohort,ind,t,prey] = min(L[cohort,ind,t,prey],np.exp(2.296 + 0.277*np.log(W[cohort,ind,t,prey]) - 0.005128*np.log(W[cohort,ind,t,prey])**2))
-                   
+                    W_AF[cohort,ind,t,prey] = W_AF[cohort,ind,t-1,prey] + (np.exp(GR)-1)*W_AF[cohort,ind,t-1,prey]
+                    larvaTdata[cohort,ind,t,prey] = Tdata
+                    larvaDepth[cohort,ind,t,prey] = depth
+                    
                     predation.FishPred(FishDens,L[cohort,ind,t,prey]*mm2m,attCoeff,Ke_predator,Eb,dt)
                     #Psurvive[ind,hour] = np.exp(-a*(L[ind]**b) - C2*(1-Pe)*Rpisci**2)
+                    #for s in range(Nhours):
+                    #TODO: FIX the survival probability
+                    larvaPsur[cohort,ind,t,prey]=larvaPsur[cohort,ind,t-1,prey]*(np.exp(-Psurvive[cohort,ind,t,prey]))
+                    #print 'Probability of survival at depth : %3.2f => %6.2f'%(depth,grdSTATION.larvaPsur*100.)
+                    """SGR over 1 timestep"""
+                    SGR[cohort,ind,t,prey]=((W[cohort,ind,t,prey]-W[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey])*100.0
                    
-                    """Sum up the total SGR over 24 hours"""
-                    Growth[cohort,ind,t,prey]=((W[cohort,ind,t,prey]-W_old)/W_old)*100.0
-                    
                     """Update time"""
+                    if ind==(Nlarva-1) and cohort==(Ncohorts-1): 
+                        julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim)
+                        larvaTime.append(julian/3600.)
+            
+                       # print "Added time to list", julian/3600.
+                        
                     currentDate=grdSTATION.refDate + datetime.timedelta(seconds=julian + dt)
                     delta=currentDate - grdSTATION.refDate 
+                    
                     julian=delta.days*86400 + delta.seconds
                     t +=1
                 
+                 
                 # TODO: FIX these lines if you want to use climatological station data 
                 #if depth <= Nlarva-1:
                 #    
@@ -431,39 +442,33 @@ def ibm(station):
                 
                 """Calculate 24 hour SGR """        
                 max_g = 1.08 + 1.79 * Tdata - 0.074 * Tdata*np.log(W[cohort,ind,t,prey]) - 0.0965 * Tdata *((np.log(W[cohort,ind,t,prey]))**2) + 0.0112 * Tdata *((np.log(W[cohort,ind,t,prey])**3.))
-                
-                """Calculate 24 hour survival probability"""
-                for s in range(Nhours):
-                    grdSTATION.larvaPsur=grdSTATION.larvaPsur*(np.exp(-Psurvive[cohort,ind,t,prey]))
-                #print 'Probability of survival at depth : %3.2f => %6.2f'%(depth,grdSTATION.larvaPsur*100.)
                      
-               # print ind, sum(Growth[ind,:]),W[ind],
-                """Store results in grdSTATION object and use that object to write to netCDF4 file"""                  
-                grdSTATION = storeObject(cohort,ind,t,prey,grdSTATION,julian,depth,W,L,Growth,max_g,Tdata,W_AF,aveLight)
-                
                 if ind==(Nlarva-1) and cohort==(Ncohorts-1): 
-                    julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim)
-                  
                     if Finish is True:
+                
                         """Write the results to file"""
-                        IOwrite.writeStationFile(grdSTATION,Ntime,cohort,ind,prey,outputFile)
+                        IOwrite.writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,W_AF,aveLight,larvaPsur,outputFile)
                         os.sys.exit()
                         
                 """ Resetting values for all larvae"""
-                if ind==(Nlarva-1): 
-                    for i in range(Nlarva):
-                        W[cohort,ind,t,prey]    = 0.093 # milligram (5mm larvae)
-                        W_AF[cohort,ind,t,prey] = 0.093
-                        S[cohort,ind,t,prey]    = 0.3*0.06*W[cohort,ind,t,prey] # 30% av max mageinnhold
-                        Age[cohort,ind,t,prey] = 0
-                        Psurvive[cohort,ind,t,prey]=1.0
-                        Growth[cohort,ind,t,prey]=0.0
-                        grdSTATION.larvaPsur=1.0
+                #if ind==(Nlarva-1): 
+                #    for i in range(Nlarva):
+                #        W[cohort,ind,t,prey]    = 0.093 # milligram (5mm larvae)
+                #        W_AF[cohort,ind,t,prey] = 0.093
+                #        S[cohort,ind,t,prey]    = 0.3*0.06*W[cohort,ind,t,prey] # 30% av max mageinnhold
+                #        Age[cohort,ind,t,prey] = 0
+                #        Psurvive[cohort,ind,t,prey]=1.0
+                #        grdSTATION.larvaPsur=1.0
                 if ind!=(Nlarva-1) and cohort!=Ncohorts:       
                     julian=oldJulian
                     t=oldT
                 hour=0
-            print t, cohort, ind, currentDate, W[cohort,ind,t,prey]
+        """Show progress indicator"""
+        message='---> running IBM'
+        p=int( ((t*1.0+2)/(1.0*Ntime))*100.)
+        progress.render(p,message)
+                        
+            #print t, cohort, ind, currentDate, W[cohort,ind,t,prey]
     
     
 if __name__=="__main__":
