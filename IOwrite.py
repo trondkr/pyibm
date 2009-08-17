@@ -5,7 +5,7 @@ import numpy as np
 import time
 import os
 
-def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,W_AF,aveLight,larvaPsur,outputFile):
+def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,aveLight,larvaPsur,outputFile):
      print outputFile
      f1 = Dataset(outputFile, mode='w', format='NETCDF4')
      f1.description="This is a IBM result file for a given station"
@@ -69,6 +69,7 @@ def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,W_AF,aveLight,larva
      f1.variables['average_light'][:,:,:,:]  = aveLight
      f1.variables['sgrAF'][:,:,:,:]  = W_AF
      f1.variables['temp'][:,:,:,:]  = larvaTdata
+     f1.variables['depth'][:,:,:,:]  = larvaDepth
     # f1.variables['sgr_rel'][:,:,:,:]  = SGR/grdSTATION.larvaSgrAF)*100.
      f1.variables['survival_probability'][:,:,:,:]  = larvaPsur
      f1.close()

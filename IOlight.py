@@ -94,8 +94,9 @@ def getPerceptionDistance(Em,k,Ke,Ap,Eb):
     """Prepare iteration"""
     r = RST
     TOL = r
-    FR2=math.log(abs(contrast)*Ap*Em)
+    FR2=np.log(abs(contrast)*Ap*Em)
     FR1=math.log(((Ke+Eb)/Eb)*r*r*math.exp(c*r))
+    
     F1 = FR1-FR2
     FDER = c + 2./r 
     TOLF = 100. * EPS

@@ -31,17 +31,17 @@ def FishPred(FishDens,Larval_m,attCoeff,Ke,Eb,seconds):
     
     """Finding the visual range in m (from AU97)"""
     VisualRange = np.sqrt(EyeSens*PreyContrast*PreyImageArea*(Eb/(Ke+Eb))) #Approximation	     
-    print 'visual range in cm',VisualRange*100.      
-    """ Calculate exact visual range (above ca 5 cm)"""
-    if VisualRange>0.05:	
-       VisualRange = IOlight.getPerceptionDistance(attCoeff,Ke,PreyImageArea,Eb)
-    print 'visual range in cm',VisualRange*100. 
+    
+    """Calculate exact visual range (above ca 5 cm)"""
+    if VisualRange>0.05:
+        VisualRange = IOlight.getPerceptionDistance(EyeSens,attCoeff,Ke,PreyImageArea,Eb)
+    #print 'visual range in cm',VisualRange*100. 
     """Calculate lethal encounter rate with fish
      setMort is either 0 (off) or 1 (on)"""
     FishMortality = setMort*(VisFieldShape*np.pi*(VisualRange**2)*FishSwimVel*FishDens)*seconds
     InvertebrateMortality = setMort*(Ambush*OtherPred(Larval_m,aPred,bPred) + (1.-Ambush)*OtherPred(Larval_m,aPred,bPred))
 
-    #TODO fix starvation mortality
+    #TODO: Fix starvation mortality
     Mortality = (InvertebrateMortality + FishMortality ) #+ ((this%starvation)*Starvation_mortality))*seconds
     #print Mortality
     return Mortality
