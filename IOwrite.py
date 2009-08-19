@@ -5,7 +5,7 @@ import numpy as np
 import time
 import os
 
-def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,aveLight,larvaPsur,outputFile):
+def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile):
      print outputFile
      f1 = Dataset(outputFile, mode='w', format='NETCDF4')
      f1.description="This is a IBM result file for a given station"
@@ -20,8 +20,8 @@ def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,ave
      f1.createDimension('prey', grdSTATION.Nprey)
     
      v_time = f1.createVariable('time', 'd', ('time',),zlib=True)
-     v_time.long_name = 'Days since 1948-01-01 00:00:00'
-     v_time.units = 'days'
+     v_time.long_name = 'Seconds since 1948-01-01 00:00:00'
+     v_time.units = 'seconds'
      v_time.field = 'time, scalar, series'
      v_time.calendar='standard'
      
@@ -49,10 +49,6 @@ def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,ave
      v.long_name = "Survival probablity"
      v.units = "day-1"
      
-     v=f1.createVariable('average_light', 'f', ('cohort','larva','time','prey'),zlib=True)
-     v.long_name = "average daily light value at day of year , depth"
-     v.units = ""
-     
      v=f1.createVariable('temp', 'f', ('cohort','larva','time','prey'),zlib=True)
      v.long_name = "Temperature"
      v.units = "degrees Celsius"
@@ -66,7 +62,6 @@ def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,ave
      f1.variables['wgt'][:,:,:,:]  = W[:,:,:,:]
      f1.variables['length'][:,:,:,:]  = L[:,:,:,:]
      f1.variables['sgr'][:,:,:,:]  = SGR[:,:,:,:]
-     f1.variables['average_light'][:,:,:,:]  = aveLight
      f1.variables['sgrAF'][:,:,:,:]  = W_AF
      f1.variables['temp'][:,:,:,:]  = larvaTdata
      f1.variables['depth'][:,:,:,:]  = larvaDepth
