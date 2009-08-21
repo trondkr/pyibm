@@ -5,8 +5,9 @@ import numpy as np
 import time
 import os
 
-def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile):
-     print outputFile
+def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex):
+     print "Outputfile is saved as %s"%(outputFile)
+     
      f1 = Dataset(outputFile, mode='w', format='NETCDF4')
      f1.description="This is a IBM result file for a given station"
      f1.history = 'Created ' + time.ctime(time.time())
@@ -18,7 +19,8 @@ def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,lar
      f1.createDimension('larva', grdSTATION.Nlarva)
      f1.createDimension('time', None)
      f1.createDimension('prey', grdSTATION.Nprey)
-    
+     f1.createDimension('IO', 2)
+     
      v_time = f1.createVariable('time', 'd', ('time',),zlib=True)
      v_time.long_name = 'Seconds since 1948-01-01 00:00:00'
      v_time.units = 'seconds'
@@ -57,6 +59,10 @@ def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,lar
      v.long_name = "Depth"
      v.units = "meter"
     
+     v=f1.createVariable('timeIndex', 'f', ('cohort','larva','IO','prey'),zlib=True)
+     v.long_name = "Array that gives the time index for entrance and exit in time of larvae"
+     v.units = "index"
+     
      f1.variables['time'][:]   = larvaTime 
      
      f1.variables['wgt'][:,:,:,:]  = W[:,:,:,:]
@@ -65,6 +71,8 @@ def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,lar
      f1.variables['sgrAF'][:,:,:,:]  = W_AF
      f1.variables['temp'][:,:,:,:]  = larvaTdata
      f1.variables['depth'][:,:,:,:]  = larvaDepth
+     f1.variables['timeIndex'][:,:,:,:]  = startAndStopIndex
+      
     # f1.variables['sgr_rel'][:,:,:,:]  = SGR/grdSTATION.larvaSgrAF)*100.
      f1.variables['survival_probability'][:,:,:,:]  = larvaPsur
      f1.close()

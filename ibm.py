@@ -54,7 +54,7 @@ def init(station):
     
     varlist=['temp','salt','u','v','taux','tauy'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
     startDate = datetime.datetime(1991,2,1,0,0,0)
-    endDate   = datetime.datetime(1991,3,15,0,0,0)
+    endDate   = datetime.datetime(1991,4,15,0,0,0)
 
     """Open the netcdf file if it existst."""
     cdf = Dataset(fileNameIn)
@@ -72,12 +72,12 @@ def init(station):
     IOnetcdf.getStationData(cdf,varlist,grdSTATION,log,clim)
     
     """Open output file:"""
-    outputFile=str(station)+'_res.nc'
+    outputFile='test_res.nc'
     if os.path.exists(outputFile): os.remove(outputFile)
     
     """Number of release dates and cohorts"""
-    NReleaseDates = 4
-    daysBetweenReleases=7
+    NReleaseDates = 8
+    daysBetweenReleases=14
     listOfReleaseDates=[]
     """Calculate release dates for individual cohorts based on days since start date of simulations."""
     listOfReleaseDates.append(startDate)
@@ -90,9 +90,22 @@ def init(station):
     If timestep is different from hour , this needs to be changed"""
     delta=(endDate - startDate)
     grdSTATION.delta=int(delta.days*24.)
-
+    grdSTATION.endDate=endDate
+    
     return grdSTATION, clim, outputFile, NReleaseDates, Finish
 
+def findActiveCohorts(isDead,isReleased):
+    co=0; co2=0
+    
+    for check in isDead:
+        if check is True: co+=1
+    for check in isReleased:
+        if check is True: co2+=1
+    activeCohorts=co2-co
+    minNumberOfActiveCohort = co
+   # print "There are currently %s active cohorts in the simulation with min cohort %s"%(activeCohorts,minNumberOfActiveCohort)
+    return activeCohorts, minNumberOfActiveCohort              
+                  
 def checkReleased(releaseDate,julian,grdSTATION):
   
     if grdSTATION.firstBatch==True:
@@ -117,14 +130,20 @@ def checkReleased(releaseDate,julian,grdSTATION):
     return release, isReleased, releaseDate
     
     
-def isAlive(julian,larvaAge,cohort,ind,t,prey,startAndStopIndex):
+def isAlive(julian,larvaAge,cohort,ind,t,prey,startAndStopIndex,isDead,grdSTATION):
     
-    if larvaAge/24. > int(NDaysAlive):
-        startAndStopIndex[cohort,ind,1,prey]==t
-        isAliveBool=False
+    if isDead[cohort]==False:
+        #print "Larva is %s days old and belongs to cohort %s"%(larvaAge/24.,cohort)
+        if larvaAge/24. > int(NDaysAlive):
+            startAndStopIndex[cohort,ind,1,prey]=t
+            isAliveBool=False
+            isDead[cohort]=True
+        else:
+            isAliveBool=True
     else:
-        isAliveBool=True
-    #print "Individ %s is %s days old in cohort %s is alive=%s"%(ind,larvaAge/24.,cohort,isAliveBool)
+        isAliveBool=False
+    grdSTATION.startAndStopIndex=startAndStopIndex
+   
     return isAliveBool
     
        
@@ -482,19 +501,19 @@ def ibm(station):
     
     """Create array for each individual larvae"""
    
-    W   =(np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
+    W   =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
     larvaPsur   =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
     larvaDepth   =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
-    W_AF=(np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
-    S   =(np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
+    W_AF=(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
+    S   =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
     Age =(np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
     startAndStopIndex =(np.ones((Ncohorts,Nlarva,2,Nprey),dtype=np.float64))*missingValue
-    L   =(np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
+    L   =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
    
-    ingrate  =(np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
+    ingrate  =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
     Psurvive =(np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
-    SGR      =(np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
-    larvaTdata   =(np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
+    SGR      =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
+    larvaTdata   =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
    
     R=np.zeros(13,dtype=np.float64)
     enc=np.zeros(13,dtype=np.float64)
@@ -525,33 +544,38 @@ def ibm(station):
  
     depth=5
     releasedCohorts=0
-    
+    isDead=[]
+    for i in range(Ncohorts): isDead.append(False)
+  
     """==================LOOP STARTS====================="""
     """Loop over all the days of interest"""
     
+     
     for day in range(Ntime):
         
         """Save the julian date and the time index so that you can reset time between each chohort and indiviual you run"""
         oldJulian=julian
         oldT=t
-    
+        release=[];isReleased=[];releaseDate=[]
+     
         """loop over all the cohorts of interest"""
         for cohort in range(Ncohorts):
             """For each day, and cohort, loop over all the individuals"""
-           
-            release, isReleased, releaseDate = checkReleased(grdSTATION.listOfReleaseDates[cohort],julian,grdSTATION)
-            print releaseDate, release, isReleased
+            a,b,c= checkReleased(grdSTATION.listOfReleaseDates[cohort],julian,grdSTATION)
+            release.append(a); isReleased.append(b); releaseDate.append(c)
             
-            if release is True:
-                print "Releasing a new cohort on %s"%(releaseDate)
+            if release[cohort] is True:
+                #print "\nReleasing a new cohort on %s"%(releaseDate[cohort])
                 released[cohort]=t
-                isReleased=True
+                isReleased[cohort]=True
                 releasedCohorts+=1
                 
-            if isReleased is False:
+                
+       # print "We have found %s cohorts that have been released"%(releasedCohorts)     
+        for cohort in range(releasedCohorts):        
+            if isReleased[cohort] is False:
                 continue
             elif released[cohort]!=0:
-                print "Looping over cohort %s of releasedcohorts %s"%(cohort,releasedCohorts)
                 for ind in range(Nlarva):
                    
                     """We create an array that controls the entrance and exit points in time for
@@ -562,7 +586,9 @@ def ibm(station):
                   
                     # TODO: Fix so that you can use any timestep. Do this by making the loop
                     # count on Nsteps instead of Nhours, where Nsteps*dt=Nhours.
-                    if isAlive(julian,Age[cohort,ind,t-1,prey],cohort,ind,t,prey,startAndStopIndex) == False:
+                    activeCohorts, minNumberOfActiveCohort = findActiveCohorts(isDead,isReleased)
+                   
+                    if isAlive(julian,Age[cohort,ind,t-1,prey],cohort,ind,t,prey,startAndStopIndex,isDead,grdSTATION) == False:
                         continue
                     else:
                         for hour in range(Nhours):
@@ -603,7 +629,7 @@ def ibm(station):
                             mortality = predation.FishPred(FishDens,L[cohort,ind,t,prey]*mm2m,attCoeff,Ke_predator,Eb,dt)
                             
                             S[cohort,ind,t,prey] = min(gut_size*W[cohort,ind,t-1,prey],S[cohort,ind,t-1,prey] + sum(ing[:]))
-        
+                            
                             ingrate[cohort,ind,t,prey] = (S[cohort,ind,t,prey] - S[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey]
                             W[cohort,ind,t,prey] = W[cohort,ind,t-1,prey] + min(GR_gram + meta,S[cohort,ind,t,prey]*assi) - meta #- 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta;
                             S[cohort,ind,t,prey] = S[cohort,ind,t,prey] - ((W[cohort,ind,t,prey] - W[cohort,ind,t-1,prey]) + meta)/assi # + 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta)/assi;
@@ -618,30 +644,27 @@ def ibm(station):
                             #print 'Probability of survival at depth : %3.2f => %6.2f'%(depth,grdSTATION.larvaPsur*100.)
                             
                             SGR[cohort,ind,t,prey]=((W[cohort,ind,t,prey]-W[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey])*100.0
-                         
-                            """Update time"""
                             
-                            if ind==0 and cohort==0: #releasedCohorts-1:
+                           
+                            if ind==0 and cohort==minNumberOfActiveCohort: #releasedCohorts-1:
                                 larvaTime.append(julian/3600.)
                            
                             julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim)
                                
                             s1=int(startAndStopIndex[cohort,ind,0,prey])
-                           
-                            Age[cohort,:,t,prey] =julian/3600.-larvaTime[s1]
-                                    
+                            
+                            Age[cohort,ind,t,prey] =julian/3600.-larvaTime[s1]
+                            
+                            """Update time"""
                             currentDate=grdSTATION.refDate + datetime.timedelta(seconds=julian + dt)
                             delta=currentDate - grdSTATION.refDate 
-                            
                             julian=delta.days*86400 + delta.seconds
                             t +=1
                          
-                        if ind==(Nlarva-1) and cohort==(Ncohorts-1):
-                            if Finish is True:
-                                """Write the results to file"""
-                                IOwrite.writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile)
-                                os.sys.exit()
-                        
+                        if grdSTATION.refDate + datetime.timedelta(seconds=julian) == grdSTATION.endDate:
+                            IOwrite.writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex)
+                            sys.exit()
+                                
                         if ind==(Nlarva-1) and cohort==(releasedCohorts-1):
                             julian=julian
                             t=t
@@ -653,7 +676,7 @@ def ibm(station):
                        # print "Released list", released, cohort
                        # print "index of start and stop",startAndStopIndex
         """Show progress indicator"""
-        message='---> running IBMtime-step %s of %s'%(t,Ntime)
+        message='---> running IBMtime-step %s of %s with %s  released cohorts'%(t,grdSTATION.refDate + datetime.timedelta(seconds=julian),releasedCohorts)
         p=int( ((t*1.0)/(1.0*Ntime))*100.)
        # progress.render(p,message)
        
