@@ -54,7 +54,7 @@ def init(station):
     
     varlist=['temp','salt','u','v','taux','tauy'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
     startDate = datetime.datetime(1991,2,1,0,0,0)
-    endDate   = datetime.datetime(1991,4,15,0,0,0)
+    endDate   = datetime.datetime(1991,6,1,0,0,0)
 
     """Open the netcdf file if it existst."""
     cdf = Dataset(fileNameIn)
@@ -76,7 +76,7 @@ def init(station):
     if os.path.exists(outputFile): os.remove(outputFile)
     
     """Number of release dates and cohorts"""
-    NReleaseDates = 8
+    NReleaseDates = 20
     daysBetweenReleases=14
     listOfReleaseDates=[]
     """Calculate release dates for individual cohorts based on days since start date of simulations."""
@@ -267,7 +267,7 @@ def calculateGrowth(depth,hour,grdSTATION,dt,Wpre,Wpost,Lpost,
        Lpost = L[cohort,ind,t,prey]
        Lpre  = L[cohort,ind,t-1,prey]"""
        
-    s_light = IOlight.surfaceLight(julian,grdSTATION.lat,hour)
+    s_light = IOlight.surfaceLight(grdSTATION,julian,grdSTATION.lat,hour)
     Eb = s_light*np.exp(attCoeff*(-depth))
 
     depthIndex1, depthIndex2, dz1, dz2 = getDepthIndex(grdSTATION,depth)
@@ -565,7 +565,7 @@ def ibm(station):
             release.append(a); isReleased.append(b); releaseDate.append(c)
             
             if release[cohort] is True:
-                #print "\nReleasing a new cohort on %s"%(releaseDate[cohort])
+                print "\nReleasing a new cohort on %s"%(releaseDate[cohort])
                 released[cohort]=t
                 isReleased[cohort]=True
                 releasedCohorts+=1
@@ -644,7 +644,8 @@ def ibm(station):
                             #print 'Probability of survival at depth : %3.2f => %6.2f'%(depth,grdSTATION.larvaPsur*100.)
                             
                             SGR[cohort,ind,t,prey]=((W[cohort,ind,t,prey]-W[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey])*100.0
-                            
+                            #if SGR[cohort,ind,t,prey] < 0.30:
+                            #    print W[cohort,ind,t,prey], SGR[cohort,ind,t,prey], Tdata, W[cohort,ind,t-1,prey], S[cohort,ind,t,prey], S[cohort,ind,t-1,prey] 
                            
                             if ind==0 and cohort==minNumberOfActiveCohort: #releasedCohorts-1:
                                 larvaTime.append(julian/3600.)
