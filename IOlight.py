@@ -1,6 +1,5 @@
 import math, datetime
 from initLarva import *
-import IOtime
 
 """
 Functions to estimate maximum surface light as a function of day of the year and latitude. 
@@ -22,20 +21,18 @@ __modified__ = datetime.datetime(2009, 7, 19)
 __version__  = "1.1"
 __status__   = "Production"
 
-def surfaceLight(julian, Lat, hour):
+def surfaceLight(grdSTATION, julian, Lat, hour):
     
     """
     Max light at sea surface
     """
     MAXLIG = 500
     
-    # Need day and hour of year
-    days_in_month = [31,28,31,30,31,30,31,31,30,31,30,31]
-    #gtime = gregorian(julian)
-    gtime = IOtime.julian_to_date(julian,hour)
+    gtime=grdSTATION.refDate + datetime.timedelta(seconds=julian)
+    tt = gtime.timetuple()
     
-    D = float(gtime[2] + sum(days_in_month[0:int(gtime[1])-1]))
-    H = float(gtime[3])
+    D = float(tt[7])
+    H = float(tt[3])
     
     P = pi
     TWLIGHT = 5.76
@@ -71,6 +68,7 @@ def surfaceLight(julian, Lat, hour):
     else:
         s_light = 1.15e-5
         
+    #print "Day of year", tt[7], "hour", tt[3], "date", gtime, s_light
     return s_light
     
 def getPerceptionDistance(Em,k,Ke,Ap,Eb):
