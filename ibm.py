@@ -53,8 +53,8 @@ def init(station):
     fileNameIn  = station
     
     varlist=['temp','salt','u','v','taux','tauy'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
-    startDate = datetime.datetime(1991,2,1,0,0,0)
-    endDate   = datetime.datetime(1991,6,1,0,0,0)
+    startDate = datetime.datetime(1991,1,1,0,0,0)
+    endDate   = datetime.datetime(1991,7,1,0,0,0)
 
     """Open the netcdf file if it existst."""
     cdf = Dataset(fileNameIn)
@@ -76,7 +76,7 @@ def init(station):
     if os.path.exists(outputFile): os.remove(outputFile)
     
     """Number of release dates and cohorts"""
-    NReleaseDates = 20
+    NReleaseDates = 30
     daysBetweenReleases=14
     listOfReleaseDates=[]
     """Calculate release dates for individual cohorts based on days since start date of simulations."""
@@ -131,7 +131,7 @@ def checkReleased(releaseDate,julian,grdSTATION):
     
     
 def isAlive(julian,larvaAge,cohort,ind,t,prey,startAndStopIndex,isDead,grdSTATION):
-    
+ #   print "Larva is %s days old and belongs to cohort %s"%(larvaAge/24.,cohort)
     if isDead[cohort]==False:
         #print "Larva is %s days old and belongs to cohort %s"%(larvaAge/24.,cohort)
         if larvaAge/24. > int(NDaysAlive):
@@ -260,7 +260,7 @@ def getData(julian,julianIndex,julianFileA,julianFileB,dz1,dz2,depthIndex1,depth
     return Tdata,Sdata,Udata,Vdata, windX, windY
 
 def calculateGrowth(depth,hour,grdSTATION,dt,Wpre,Wpost,Lpost,
-                    julian,julianIndex,julianFileA,julianFileB,R,enc,hand,ing,pca,Spre):
+                    julian,julianIndex,julianFileA,julianFileB,R,enc,hand,ing,pca,Spre,prey):
     
     """Wpost = W[cohort,ind,t,prey]
        Wpre  = W[cohort,ind,t-1,prey]
@@ -297,7 +297,7 @@ def calculateGrowth(depth,hour,grdSTATION,dt,Wpre,Wpost,Lpost,
         
     for j in range(13):
         hand[j] = 0.264*10**(7.0151*(calanus_L1[j]/Lpost)) # Walton 1992
-        enc[j] = (0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * calanus_D[j]* ltr2mm3
+        enc[j] = (0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * (calanus_D[j]*prey)* ltr2mm3
         pca[j] = enc[j]*max(0.0,min(1.0,-16.7*(calanus_L1[j]/Lpost) + 3.0/2.0))
         ing[j] = dt*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]);
       
@@ -506,7 +506,7 @@ def ibm(station):
     larvaDepth   =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
     W_AF=(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
     S   =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
-    Age =(np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
+    Age =(np.ones((Ncohorts,Nlarva,Nprey),dtype=np.float64))*missingValue
     startAndStopIndex =(np.ones((Ncohorts,Nlarva,2,Nprey),dtype=np.float64))*missingValue
     L   =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
    
@@ -526,11 +526,10 @@ def ibm(station):
     grdSTATION.Ndays=Ntime/24.
     grdSTATION.Nlarva=Nlarva
     grdSTATION.Ncohorts=Ncohorts
-    grdSTATION.Nprey=1.0
+    grdSTATION.Nprey=Nprey
     grdSTATION.larvaPsur=1.0
     grdSTATION.firstBatch=True
     
-    prey=0
     t=1
     
     print "RANDOM WEIGHT INITIALIZED"
@@ -559,6 +558,7 @@ def ibm(station):
         release=[];isReleased=[];releaseDate=[]
      
         """loop over all the cohorts of interest"""
+        noOneLeft=True
         for cohort in range(Ncohorts):
             """For each day, and cohort, loop over all the individuals"""
             a,b,c= checkReleased(grdSTATION.listOfReleaseDates[cohort],julian,grdSTATION)
@@ -569,113 +569,127 @@ def ibm(station):
                 released[cohort]=t
                 isReleased[cohort]=True
                 releasedCohorts+=1
-                
+                noOneLeft=False
                 
        # print "We have found %s cohorts that have been released"%(releasedCohorts)     
         for cohort in range(releasedCohorts):        
             if isReleased[cohort] is False:
                 continue
             elif released[cohort]!=0:
-                for ind in range(Nlarva):
-                   
-                    """We create an array that controls the entrance and exit points in time for
-                    a given larvae"""
-                    if startAndStopIndex[cohort,ind,0,prey]<=missingValue:
-                        startAndStopIndex[cohort,ind,0,prey]=t-1
-                        Age[cohort,ind,t-1,prey]=0
-                  
-                    # TODO: Fix so that you can use any timestep. Do this by making the loop
-                    # count on Nsteps instead of Nhours, where Nsteps*dt=Nhours.
-                    activeCohorts, minNumberOfActiveCohort = findActiveCohorts(isDead,isReleased)
-                   
-                    if isAlive(julian,Age[cohort,ind,t-1,prey],cohort,ind,t,prey,startAndStopIndex,isDead,grdSTATION) == False:
-                        continue
-                    else:
-                        for hour in range(Nhours):
-                         
-                            L[cohort,ind,t,prey] = np.exp(2.296 + 0.277*np.log(W[cohort,ind,t-1,prey]) - 0.005128*np.log(W[cohort,ind,t-1,prey])**2)
-                            swimSpeed=0.261*(L[cohort,ind,t,prey]**(1.552*L[cohort,ind,t,prey]**(0.920-1.0)))-(5.289/L[cohort,ind,t,prey])
-                            maxHourlyMove=(swimSpeed*(dt/1000.))/4.0 # Divided by four compared to original IBM in fortran
-        
-                            oldDepth,optDepth,h_start,h_stop,NOptDepths,oldFitness = initBehavior(depth,maxHourlyMove)
-                           
-                            for findDepth in range(NOptDepths+1):
-                                depth=h_start+findDepth
+                for prey in range(Nprey):
+                    for ind in range(Nlarva):
+                       
+                        """We create an array that controls the entrance and exit points in time for
+                        a given larvae"""
+                        if startAndStopIndex[cohort,ind,0,prey]<=missingValue:
+                            startAndStopIndex[cohort,ind,0,prey]=t-1
+                            Age[cohort,ind,prey]=0
+                      
+                        # TODO: Fix so that you can use any timestep. Do this by making the loop
+                        # count on Nsteps instead of Nhours, where Nsteps*dt=Nhours.
+                        activeCohorts, minNumberOfActiveCohort = findActiveCohorts(isDead,isReleased)
+                        #print "There are currently %s active cohorts with minimum number %s"%(activeCohorts,minNumberOfActiveCohort)
+                        #print ind,cohort,t,prey,Age[cohort,ind,prey]
+                        if isAlive(julian,Age[cohort,ind,prey],cohort,ind,t,prey,startAndStopIndex,isDead,grdSTATION) == False:
+                            
+                            if noOneLeft==True and ind==(Nlarva-1) and cohort==(releasedCohorts-1) and prey==(Nprey-1):
                                 
-                                """Calculate growth at the current depth layer"""
-                                ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness = calculateGrowth(depth,hour,grdSTATION,dt,W[cohort,ind,t-1,prey],
-                                                                                             W[cohort,ind,t,prey],L[cohort,ind,t,prey],
-                                                                                             julian,julianIndex,julianFileA,julianFileB,
-                                                                                             R,enc,hand,ing,pca,S[cohort,ind,t-1,prey])
-                                """Calculate mortality at the current depth layer"""
-                                mortality = predation.FishPred(FishDens,L[cohort,ind,t,prey]*mm2m,attCoeff,Ke_predator,Eb,dt)
-                                """Calculate fitness at the current depth layer"""
-                                F = sum(ing)/W[cohort,ind,t-1,prey]
+                                currentDate=grdSTATION.refDate + datetime.timedelta(seconds=julian + dt*24)
+                                delta=currentDate - grdSTATION.refDate 
+                                julian=delta.days*86400 + delta.seconds
+                                noOneLeft=True
                                 
-                                optDepth,oldFitness = getBehavior(stomachFullness,
-                                                             F,mortality,L[cohort,ind,t,prey],
-                                                             oldFitness,depth,optDepth)
-                                
-                                
-                            #print "Best depth is: ", optDepth, hour, L[cohort,ind,t,prey], maxHourlyMove
-                            depth=optDepth
-                            
-                            """Now recalculate the growth and mortality at the optimal depth layer"""
-                            ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness = calculateGrowth(depth,hour,grdSTATION,dt,W[cohort,ind,t-1,prey],
-                                                                                 W[cohort,ind,t,prey],L[cohort,ind,t,prey],
-                                                                                 julian,julianIndex,julianFileA,julianFileB,
-                                                                                 R,enc,hand,ing,pca,S[cohort,ind,t-1,prey])
-                            
-                            mortality = predation.FishPred(FishDens,L[cohort,ind,t,prey]*mm2m,attCoeff,Ke_predator,Eb,dt)
-                            
-                            S[cohort,ind,t,prey] = min(gut_size*W[cohort,ind,t-1,prey],S[cohort,ind,t-1,prey] + sum(ing[:]))
-                            
-                            ingrate[cohort,ind,t,prey] = (S[cohort,ind,t,prey] - S[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey]
-                            W[cohort,ind,t,prey] = W[cohort,ind,t-1,prey] + min(GR_gram + meta,S[cohort,ind,t,prey]*assi) - meta #- 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta;
-                            S[cohort,ind,t,prey] = S[cohort,ind,t,prey] - ((W[cohort,ind,t,prey] - W[cohort,ind,t-1,prey]) + meta)/assi # + 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta)/assi;
-        
-                            W_AF[cohort,ind,t,prey] = W_AF[cohort,ind,t-1,prey] + (np.exp(GR)-1)*W_AF[cohort,ind,t-1,prey]
-                            larvaTdata[cohort,ind,t,prey] = Tdata
-                            larvaDepth[cohort,ind,t,prey] = depth
-                            #Psurvive[ind,hour] = np.exp(-a*(L[ind]**b) - C2*(1-Pe)*Rpisci**2)
-                            #for s in range(Nhours):
-                            #TODO: FIX the survival probability
-                            larvaPsur[cohort,ind,t,prey]=larvaPsur[cohort,ind,t-1,prey]*(np.exp(-Psurvive[cohort,ind,t,prey]))
-                            #print 'Probability of survival at depth : %3.2f => %6.2f'%(depth,grdSTATION.larvaPsur*100.)
-                            
-                            SGR[cohort,ind,t,prey]=((W[cohort,ind,t,prey]-W[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey])*100.0
-                            #if SGR[cohort,ind,t,prey] < 0.30:
-                            #    print W[cohort,ind,t,prey], SGR[cohort,ind,t,prey], Tdata, W[cohort,ind,t-1,prey], S[cohort,ind,t,prey], S[cohort,ind,t-1,prey] 
-                           
-                            if ind==0 and cohort==minNumberOfActiveCohort: #releasedCohorts-1:
-                                larvaTime.append(julian/3600.)
-                           
-                            julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim)
-                               
-                            s1=int(startAndStopIndex[cohort,ind,0,prey])
-                            
-                            Age[cohort,ind,t,prey] =julian/3600.-larvaTime[s1]
-                            
-                            """Update time"""
-                            currentDate=grdSTATION.refDate + datetime.timedelta(seconds=julian + dt)
-                            delta=currentDate - grdSTATION.refDate 
-                            julian=delta.days*86400 + delta.seconds
-                            t +=1
-                         
-                        if grdSTATION.refDate + datetime.timedelta(seconds=julian) == grdSTATION.endDate:
-                            IOwrite.writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex)
-                            sys.exit()
-                                
-                        if ind==(Nlarva-1) and cohort==(releasedCohorts-1):
-                            julian=julian
-                            t=t
+                                #t+=1
+                                print "Updating time as no cohort is alive currently",currentDate
                         else:
-                            julian=oldJulian
-                            t=oldT
-                        
-                        hour=0
-                       # print "Released list", released, cohort
-                       # print "index of start and stop",startAndStopIndex
+                            noOneLeft=False
+                         
+                            for hour in range(Nhours):
+                             
+                                L[cohort,ind,t,prey] = np.exp(2.296 + 0.277*np.log(W[cohort,ind,t-1,prey]) - 0.005128*np.log(W[cohort,ind,t-1,prey])**2)
+                                swimSpeed=0.261*(L[cohort,ind,t,prey]**(1.552*L[cohort,ind,t,prey]**(0.920-1.0)))-(5.289/L[cohort,ind,t,prey])
+                                maxHourlyMove=(swimSpeed*(dt/1000.))/4.0 # Divided by four compared to original IBM in fortran
+            
+                                oldDepth,optDepth,h_start,h_stop,NOptDepths,oldFitness = initBehavior(depth,maxHourlyMove)
+                               
+                                for findDepth in range(NOptDepths+1):
+                                    depth=h_start+findDepth
+                                    
+                                    """Calculate growth at the current depth layer"""
+                                    ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness = calculateGrowth(depth,hour,grdSTATION,dt,W[cohort,ind,t-1,prey],
+                                                                                                 W[cohort,ind,t,prey],L[cohort,ind,t,prey],
+                                                                                                 julian,julianIndex,julianFileA,julianFileB,
+                                                                                                 R,enc,hand,ing,pca,S[cohort,ind,t-1,prey],prey)
+                                    """Calculate mortality at the current depth layer"""
+                                    mortality = predation.FishPred(FishDens,L[cohort,ind,t,prey]*mm2m,attCoeff,Ke_predator,Eb,dt)
+                                    """Calculate fitness at the current depth layer"""
+                                    F = sum(ing)/W[cohort,ind,t-1,prey]
+                                    
+                                    optDepth,oldFitness = getBehavior(stomachFullness,
+                                                                 F,mortality,L[cohort,ind,t,prey],
+                                                                 oldFitness,depth,optDepth)
+                                """Set the optimal depth equal to result of optimal loop"""    
+                                depth=optDepth
+                                
+                                """Now recalculate the growth and mortality at the optimal depth layer"""
+                                ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness = calculateGrowth(depth,hour,grdSTATION,dt,W[cohort,ind,t-1,prey],
+                                                                                     W[cohort,ind,t,prey],L[cohort,ind,t,prey],
+                                                                                     julian,julianIndex,julianFileA,julianFileB,
+                                                                                     R,enc,hand,ing,pca,S[cohort,ind,t-1,prey],prey)
+                                
+                                mortality = predation.FishPred(FishDens,L[cohort,ind,t,prey]*mm2m,attCoeff,Ke_predator,Eb,dt)
+                                
+                                S[cohort,ind,t,prey] = min(gut_size*W[cohort,ind,t-1,prey],S[cohort,ind,t-1,prey] + sum(ing[:]))
+                                
+                                ingrate[cohort,ind,t,prey] = (S[cohort,ind,t,prey] - S[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey]
+                                W[cohort,ind,t,prey] = W[cohort,ind,t-1,prey] + min(GR_gram + meta,S[cohort,ind,t,prey]*assi) - meta #- 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta;
+                                S[cohort,ind,t,prey] = S[cohort,ind,t,prey] - ((W[cohort,ind,t,prey] - W[cohort,ind,t-1,prey]) + meta)/assi # + 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta)/assi;
+            
+                                W_AF[cohort,ind,t,prey] = W_AF[cohort,ind,t-1,prey] + (np.exp(GR)-1)*W_AF[cohort,ind,t-1,prey]
+                                larvaTdata[cohort,ind,t,prey] = Tdata
+                                larvaDepth[cohort,ind,t,prey] = depth
+                                #Psurvive[ind,hour] = np.exp(-a*(L[ind]**b) - C2*(1-Pe)*Rpisci**2)
+                                #for s in range(Nhours):
+                                #TODO: FIX the survival probability
+                                larvaPsur[cohort,ind,t,prey]=larvaPsur[cohort,ind,t-1,prey]*(np.exp(-Psurvive[cohort,ind,t,prey]))
+                                #print 'Probability of survival at depth : %3.2f => %6.2f'%(depth,grdSTATION.larvaPsur*100.)
+                                
+                                SGR[cohort,ind,t,prey]=((W[cohort,ind,t,prey]-W[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey])*100.0
+                                #if SGR[cohort,ind,t,prey] < 0.30:
+                                #    print W[cohort,ind,t,prey], SGR[cohort,ind,t,prey], Tdata, W[cohort,ind,t-1,prey], S[cohort,ind,t,prey], S[cohort,ind,t-1,prey] 
+                               
+                                if ind==0 and cohort==minNumberOfActiveCohort and prey==0: #releasedCohorts-1:
+                                    larvaTime.append(julian/3600.)
+                               
+                                julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim)
+                                   
+                                s1=int(startAndStopIndex[cohort,ind,0,prey])
+                                
+                                Age[cohort,ind,prey] =julian/3600.-larvaTime[s1]
+                                
+                                """Update time"""
+                                currentDate=grdSTATION.refDate + datetime.timedelta(seconds=julian + dt)
+                                delta=currentDate - grdSTATION.refDate 
+                                julian=delta.days*86400 + delta.seconds
+                                t +=1
+                             
+                            if grdSTATION.refDate + datetime.timedelta(seconds=julian) == grdSTATION.endDate:
+                                IOwrite.writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex)
+                                sys.exit()
+                                    
+                            if ind==(Nlarva-1) and cohort==(releasedCohorts-1) and prey==(Nprey-1):
+                                julian=julian
+                                print "Current date updates", currentDate, prey,ind,cohort
+                                t=t
+                            else:
+                                julian=oldJulian
+                                t=oldT
+                            
+                            hour=0
+                            
+                           # print "Released list", released, cohort
+                           # print "index of start and stop",startAndStopIndex
+                    ind=0
         """Show progress indicator"""
         message='---> running IBMtime-step %s of %s with %s  released cohorts'%(t,grdSTATION.refDate + datetime.timedelta(seconds=julian),releasedCohorts)
         p=int( ((t*1.0)/(1.0*Ntime))*100.)

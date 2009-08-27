@@ -5,6 +5,7 @@ from progressBar import progressBar
 Define global variables
 =======================
 """
+missingValue=-9.99e-35
 dt      = 3600                   
 sec2day = 1.0/86400.0
 gut_size= 0.06
@@ -28,12 +29,13 @@ Ke_larvae = 1
 Ke_predator = 1              
 attCoeff = 0.18
 Nhours =24
-Nlarva=1
+Nlarva=10
+NDaysAlive=30
 FishDens = 0.0001	#Predation from fish depends on density of predators
-Nprey=1
+Nprey=10
 
 """ Initialize Calanus """
-calanus_D  = [0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
+calanus_D  = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
 calanus_W  = [0.33, 0.49, 1., 1.51,2.09, 2.76, 4.18, 13.24, 23.13, 63.64, 169.58, 276.29, 276.29] #(micrograms)
 calanus_L1 = [0.22, 0.27, 0.4, 0.48, 0.55, 0.61, 0.79, 1.08, 1.38, 1.8, 2.43, 2.11, 2.11] #(length in mm)
 calanus_L2 = [0.1, 0.1, 0.1, 0.15,  0.18, 0.2, 0.22, 0.25, 0.31, 0.41, 0.52, 0.65, 0.65] #(width in mm)
