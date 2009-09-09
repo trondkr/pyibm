@@ -5,6 +5,16 @@ from progressBar import progressBar
 Define global variables
 =======================
 """
+
+"""Number of release dates and cohorts"""
+NReleaseDates=14
+daysBetweenReleases=30
+Nlarva=5
+NDaysAlive=30
+Nprey=1
+# Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
+MultiplyPrey=10
+
 missingValue=-9.99e-35
 dt      = 3600                   
 sec2day = 1.0/86400.0
@@ -12,7 +22,7 @@ gut_size= 0.06
 stomach_threshold = 0.3
 tau   = 2.0                     
 omega = 0.0
-f     = 0.43                     
+f     = 0.43                 
 pi    = np.pi
 mm2m  = 0.001
 m2mm  = 1000.
@@ -29,10 +39,8 @@ Ke_larvae = 1
 Ke_predator = 1              
 attCoeff = 0.18
 Nhours =24
-Nlarva=10
-NDaysAlive=30
 FishDens = 0.0001	#Predation from fish depends on density of predators
-Nprey=10
+
 
 """ Initialize Calanus """
 calanus_D  = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)

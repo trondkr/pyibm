@@ -6,7 +6,6 @@ import time
 import os
 
 def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex):
-     print "Outputfile is saved as %s"%(outputFile)
      
      f1 = Dataset(outputFile, mode='w', format='NETCDF4')
      f1.description="This is a IBM result file for a given station"
@@ -59,7 +58,7 @@ def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,lar
      v.long_name = "Depth"
      v.units = "meter"
     
-     v=f1.createVariable('timeIndex', 'f', ('cohort','larva','IO','prey'),zlib=True)
+     v=f1.createVariable('timeIndex', 'f', ('cohort','larva','IO'),zlib=True)
      v.long_name = "Array that gives the time index for entrance and exit in time of larvae"
      v.units = "index"
      
@@ -71,7 +70,7 @@ def writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,lar
      f1.variables['sgrAF'][:,:,:,:]  = W_AF
      f1.variables['temp'][:,:,:,:]  = larvaTdata
      f1.variables['depth'][:,:,:,:]  = larvaDepth
-     f1.variables['timeIndex'][:,:,:,:]  = startAndStopIndex
+     f1.variables['timeIndex'][:,:,:]  = startAndStopIndex
       
     # f1.variables['sgr_rel'][:,:,:,:]  = SGR/grdSTATION.larvaSgrAF)*100.
      f1.variables['survival_probability'][:,:,:,:]  = larvaPsur
