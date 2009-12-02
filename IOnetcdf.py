@@ -54,4 +54,5 @@ def getStationData(cdf, varlist, grdSTATION, log, clim):
    
     grdSTATION.data=var_array_rawXYZ
     grdSTATION.dataXY=var_array_rawXY
-   
+    grdSTATION.lat = float(cdf.variables['lat'][:])
+    

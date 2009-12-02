@@ -1,5 +1,5 @@
 import os, sys, string
-from shutil import copy2
+from shutil import move
 import netCDF4
 from netCDF4 import num2date, Dataset
 import types
@@ -12,11 +12,10 @@ Import modules created as part of project
 """
 
 """ Get self made modules"""
-dir='/Users/trond/Projects/arcwarm/SODA/soda2roms'
+dirMine='/Users/trond/Projects/arcwarm/SODA/soda2roms'
 
-if os.path.isdir(dir):
-    sys.path.append(dir)
-
+if os.path.isdir(dirMine):
+    sys.path.append(dirMine)
 
 import grd
 import IOverticalGrid
@@ -61,8 +60,8 @@ def init(station):
     grdSTATION = grd.grdClass(fileNameIn,"STATION")
     
     varlist=['temp','salt','u','v','taux','tauy'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
-    startDate = datetime.datetime(1990,1,1,0,0,0)
-    endDate   = datetime.datetime(1991,1,1,0,0,0)
+    startDate = datetime.datetime(1993,1,1,0,0,0)
+    endDate   = datetime.datetime(1994,1,1,0,0,0)
     
     """Get the time information and find the indices for start and stop data to extract relative to
     the time period wanted. Takes input data:
@@ -71,6 +70,10 @@ def init(station):
     
     """Extract the variables at the given station and store in the grdSTATION object"""
     IOnetcdf.getStationData(cdf,varlist,grdSTATION,log,clim)
+    """Store the maximum and minimum temperature values for the time period of interest, and
+    use these to find the prey density as a function of temperature: function calculateGrowth"""
+    grdSTATION.minT = grdSTATION.data[:,:,0].min()
+    grdSTATION.maxT = grdSTATION.data[:,:,0].max()
     
     """Open output file:"""
     outputFile="IBM_"+str(startDate.year)+"_"+os.path.basename(station)
@@ -81,13 +84,13 @@ def init(station):
     listOfReleaseDates=[]
     """Calculate release dates for individual cohorts based on days since start date of simulations."""
     listOfReleaseDates.append(startDate)
-    """Have to import NReleaseDates as this global variable is being changed locally"""
-    from initLarva import NReleaseDates
-    for i in range(NReleaseDates):
+  
+    for i in range(NReleaseDatesInit):
         date=startDate+datetime.timedelta(daysBetweenReleases*(i+1))
         if endDate >= date + datetime.timedelta(days=NDaysAlive):
             listOfReleaseDates.append(date)
-    global NReleaseDates; NReleaseDates=len(listOfReleaseDates)
+        
+    NReleaseDates=len(listOfReleaseDates)
     grdSTATION.listOfReleaseDates=listOfReleaseDates
     
     print "\nThis simulation will release a total of %s cohorts on the following dates:"%(NReleaseDates)
@@ -284,7 +287,7 @@ def calculateGrowth(depth,hour,grdSTATION,dt,Wpre,Wpost,Lpost,
        
     s_light = IOlight.surfaceLight(grdSTATION,julian,grdSTATION.lat,hour)
     Eb = s_light*np.exp(attCoeff*(-depth))
-
+  #  print "Light level: %s and surface %s"%(Eb,s_light)
     depthIndex1, depthIndex2, dz1, dz2 = getDepthIndex(grdSTATION,depth)
     Tdata,Sdata,Udata,Vdata,windX,windY = getData(julian,julianIndex,julianFileA,
                                       julianFileB,dz1,dz2,depthIndex1,
@@ -306,13 +309,24 @@ def calculateGrowth(depth,hour,grdSTATION,dt,Wpre,Wpost,Lpost,
     GR_gram = (np.exp(GR) - 1)*Wpre
                    
     Em = Lpost**2/(contrast*0.1*0.2*0.75) #Size-specific sensitivity of the visual system (Fiksen,02)
-    for j in range(13):
+    for j in range(2):
         Ap_calanus = 0.75*calanus_L1[j]*mm2m*calanus_L2[j]*mm2m
         R[j] = (IOlight.getPerceptionDistance(Em,attCoeff,Ke_larvae,Ap_calanus,Eb))*m2mm
+    """ Calculate seasonal prey density based on temperature"""
+    if Tdata < 0.5*grdSTATION.maxT:
+        P=(Tdata - grdSTATION.minT) / (0.5*grdSTATION.maxT - grdSTATION.minT)    
+    else: P=1
+    P = P * grdSTATION.ratioOfMaxLight 
+   # print 'maximum %s min %s and temp %s P= %s prey=%s l=%s'%(grdSTATION.data[:,:,0].max(),
+   #                                                           grdSTATION.data[:,:,0].min(), Tdata,
+   #                                                           P,
+   #                                                           (prey+1)*MultiplyPrey*P,
+   #                                                           grdSTATION.ratioOfMaxLight)
     
-    for j in range(13):
+    
+    for j in range(2):
         hand[j] = 0.264*10**(7.0151*(calanus_L1[j]/Lpost)) # Walton 1992
-        enc[j] = (0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * (calanus_D[j]*((prey+1)*MultiplyPrey))* ltr2mm3
+        enc[j] = (0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * (calanus_D[j]*((prey+1)*MultiplyPrey*P))* ltr2mm3
         pca[j] = enc[j]*max(0.0,min(1.0,-16.7*(calanus_L1[j]/Lpost) + 3.0/2.0))
         ing[j] = dt*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]);
       
@@ -322,17 +336,17 @@ def calculateGrowth(depth,hour,grdSTATION,dt,Wpre,Wpost,Lpost,
    
 def getMaxMinDepths(oldDepth,maxHourlyMove):
     if (oldDepth>maxHourlyMove and oldDepth < 100):
-       h_start = oldDepth - maxHourlyMove
-       h_end   = oldDepth + maxHourlyMove
+        h_start = oldDepth - maxHourlyMove
+        h_end   = oldDepth + maxHourlyMove
 
     elif (oldDepth <= maxHourlyMove):
-       h_start=0
-       h_end=min(100,oldDepth + maxHourlyMove)
+        h_start=0
+        h_end=min(100,oldDepth + maxHourlyMove)
     elif (oldDepth + maxHourlyMove >= 100):
-       h_start=max(1,oldDepth-maxHourlyMove)
-       h_end=100
+        h_start=max(1,oldDepth-maxHourlyMove)
+        h_end=100
     else:
-       print 'STOP: Depth error (ibm.py:getMaxMinDepths)'
+        print 'STOP: Depth error (ibm.py:getMaxMinDepths)'
 
     return int(h_start),int(h_end)
 
@@ -546,6 +560,7 @@ def ibm(station):
     grdSTATION.firstBatch=True
     
     t=1
+    loopsDone = False
     
     print "RANDOM WEIGHT INITIALIZED"
     W[:,:,:,:]         = 0.093 
@@ -566,12 +581,12 @@ def ibm(station):
     
      
     for day in range(Ntime):
-        
+        if loopsDone : break
         """Save the julian date and the time index so that you can reset time between each chohort and indiviual you run"""
         oldJulian=julian
         oldT=t
         release=[];isReleased=[];releaseDate=[]
-     
+        
         """loop over all the cohorts of interest"""
         noOneLeft=True
         for cohort in range(Ncohorts):
@@ -587,7 +602,8 @@ def ibm(station):
                 noOneLeft=False
                 
        # print "We have found %s cohorts that have been released"%(releasedCohorts)     
-        for cohort in range(releasedCohorts):        
+        for cohort in range(releasedCohorts):
+            
             if isReleased[cohort] is False:
                 continue
             elif released[cohort]!=0:
@@ -596,7 +612,7 @@ def ibm(station):
                 for prey in range(Nprey):
                     
                     for ind in range(Nlarva):
-                       
+                        if loopsDone : break
                         """We create an array that controls the entrance and exit points in time for
                         a given larvae"""
                         if startAndStopIndex[cohort,ind,0]<=missingValue:
@@ -634,7 +650,7 @@ def ibm(station):
                                                                                                  julian,julianIndex,julianFileA,julianFileB,
                                                                                                  R,enc,hand,ing,pca,S[cohort,ind,t-1,prey],prey)
                                     """Calculate mortality at the current depth layer"""
-                                    mortality = predation.FishPred(FishDens,L[cohort,ind,t,prey]*mm2m,attCoeff,Ke_predator,Eb,dt)
+                                    mortality = predation.FishPredAndStarvation(FishDens,L[cohort,ind,t,prey]*mm2m,W[cohort,ind,t,prey],attCoeff,Ke_predator,Eb,dt)
                                     """Calculate fitness at the current depth layer"""
                                     F = sum(ing)/W[cohort,ind,t-1,prey]
                                     
@@ -652,7 +668,7 @@ def ibm(station):
                                                                                      julian,julianIndex,julianFileA,julianFileB,
                                                                                      R,enc,hand,ing,pca,S[cohort,ind,t-1,prey],prey)
                                 
-                                mortality = predation.FishPred(FishDens,L[cohort,ind,t,prey]*mm2m,attCoeff,Ke_predator,Eb,dt)
+                                mortality = predation.FishPredAndStarvation(FishDens,L[cohort,ind,t,prey]*mm2m,W[cohort,ind,t,prey],attCoeff,Ke_predator,Eb,dt)
                                 
                                 S[cohort,ind,t,prey] = min(gut_size*W[cohort,ind,t-1,prey],S[cohort,ind,t-1,prey] + sum(ing[:]))
                                 
@@ -663,7 +679,7 @@ def ibm(station):
                                 W_AF[cohort,ind,t,prey] = W_AF[cohort,ind,t-1,prey] + (np.exp(GR)-1)*W_AF[cohort,ind,t-1,prey]
                                 larvaTdata[cohort,ind,t,prey] = Tdata
                                 larvaDepth[cohort,ind,t,prey] = depth
-                                mortality = predation.FishPred(FishDens,L[cohort,ind,t,prey]*mm2m,attCoeff,Ke_predator,Eb,dt)
+                                mortality = predation.FishPredAndStarvation(FishDens,L[cohort,ind,t,prey]*mm2m,W[cohort,ind,t,prey],attCoeff,Ke_predator,Eb,dt)
                                
                                 larvaPsur[cohort,ind,t,prey]=larvaPsur[cohort,ind,t-1,prey]*(np.exp(-mortality))
                                # print 'Probability of survival at depth : %3.2f for hour %s => %6.2f'%(depth,t,larvaPsur[cohort,ind,t,prey]*100.)
@@ -689,12 +705,15 @@ def ibm(station):
                             last=grdSTATION.listOfReleaseDates[-1] + datetime.timedelta(days=NDaysAlive)
                   
                             if now == grdSTATION.endDate or now == last:
+                               
                                 if ind==(Nlarva-1) and cohort==(releasedCohorts-1) and prey==(Nprey-1):
                                     startAndStopIndex[cohort,:,1]=t
                                     IOwrite.writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex)
-                                    copy2(outputFile, "results/"+outputFile)
+                                    move(outputFile, "results/"+outputFile)
+                                  
                                     print "Result file is saved as %s"%("results/"+outputFile)
-                                    sys.exit
+                                    loopsDone = True
+                                    break
                                     
                             if ind==(Nlarva-1) and cohort==(releasedCohorts-1) and prey==(Nprey-1):
                                 julian=julian
@@ -706,10 +725,11 @@ def ibm(station):
                             
                             hour=0
                     ind=0
-        """Show progress indicator"""
-        message='---> running IBMtime-step %s of %s with %s released cohorts (%s finished)'%(t,grdSTATION.refDate + datetime.timedelta(seconds=julian),releasedCohorts,minNumberOfActiveCohort)
-        p=int( ((t*1.0)/(1.0*(Ntime-24)))*100.)
-        progress.render(p,message)
+        if loopsDone is False:
+            """Show progress indicator"""
+            message='---> running IBMtime-step %s of %s with %s released cohorts (%s finished)'%(t,grdSTATION.refDate + datetime.timedelta(seconds=julian),releasedCohorts,minNumberOfActiveCohort)
+            p=int( ((t*1.0)/(1.0*(Ntime-24)))*100.)
+            progress.render(p,message)
        
     
 if __name__=="__main__":
@@ -726,7 +746,7 @@ if __name__=="__main__":
               "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_Lofoten.nc",
               "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_NorthSea.nc",
               "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_Iceland.nc"]
-#    stations=["/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_NorthSea.nc"]
+    #stations=["/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_NorthSea.nc"]
 
     
     for station in stations:

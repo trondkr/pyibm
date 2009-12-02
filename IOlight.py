@@ -26,7 +26,7 @@ def surfaceLight(grdSTATION, julian, Lat, hour):
     """
     Max light at sea surface
     """
-    MAXLIG = 500
+    MAXLIG = 500.0
     
     gtime=grdSTATION.refDate + datetime.timedelta(seconds=julian)
     tt = gtime.timetuple()
@@ -34,8 +34,9 @@ def surfaceLight(grdSTATION, julian, Lat, hour):
     D = float(tt[7])
     H = float(tt[3])
     
-    P = pi
-    TWLIGHT = 5.76
+    P = math.pi
+    TWLIGHT = 0.76
+    grdSTATION.ratioOfMaxLight = (MAXLIG * 0.1 + MAXLIG * abs(math.sin(math.pi*(D*1.0)/365.0))) / MAXLIG
     
     MAXLIG = MAXLIG * 0.1 + MAXLIG * abs(math.sin(math.pi*(D*1.0)/365.0))
     
@@ -56,8 +57,8 @@ def surfaceLight(grdSTATION, julian, Lat, hour):
     HEIGHT = DELTA*math.sin(math.radians(Lat*1.))- math.sqrt(1.-DELTA**2)*math.cos(math.radians(Lat*1.))*math.cos(math.radians(15.0*H))
       
     V = math.asin(HEIGHT)
-    
-    if (V >= 0):                 
+  
+    if (V > 0.0):                 
         s_light = MAXLIG*(HEIGHT/H12) + TWLIGHT
     elif (V >= -6):
         s_light = ((TWLIGHT - 0.048)/6.)*(6.+V)+.048
@@ -68,7 +69,7 @@ def surfaceLight(grdSTATION, julian, Lat, hour):
     else:
         s_light = 1.15e-5
         
-    #print "Day of year", tt[7], "hour", tt[3], "date", gtime, s_light
+    #print "Day of year", tt[7], "hour", tt[3], "date", gtime, s_light, Lat
     return s_light
     
 def getPerceptionDistance(Em,k,Ke,Ap,Eb):

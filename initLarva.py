@@ -1,19 +1,30 @@
 import numpy as np
 from progressBar import progressBar
+import datetime as datetime
+
+__author__   = 'Trond Kristiansen'
+__email__    = 'trond.kristiansen@imr.no'
+__created__  = datetime.datetime(2008, 6, 9)
+__modified__ = datetime.datetime(2009, 8, 10)
+__version__  = "1.1.5"
+__status__   = "Production"
+
 """
-=======================
-Define global variables
-=======================
+====================================================================
+Define global 
+Variables that are imported to ibm.py using from initLarva import *
+====================================================================
 """
 
-"""Number of release dates and cohorts"""
-NReleaseDates=14
-daysBetweenReleases=30
-Nlarva=5
+"""Number of release dates and cohorts. This will be lowered if NReleaseDatesInit*daysBetweenReleases is
+more than total number of simulation days : see function init in ibm.py"""
+NReleaseDatesInit=30
+daysBetweenReleases=14
+Nlarva=1
 NDaysAlive=30
 Nprey=1
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
-MultiplyPrey=10
+MultiplyPrey=20
 
 missingValue=-9.99e-35
 dt      = 3600                   
@@ -40,7 +51,6 @@ Ke_predator = 1
 attCoeff = 0.18
 Nhours =24
 FishDens = 0.0001	#Predation from fish depends on density of predators
-
 
 """ Initialize Calanus """
 calanus_D  = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
