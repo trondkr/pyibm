@@ -15,22 +15,19 @@ __status__   = "Development"
 
 missingValue=-9.99e-35
 
-stations1968=["results/IBM_1978_station_Lofoten.nc",
-         "results/IBM_1978_station_GeorgesBank.nc",
-         "results/IBM_1978_station_NorthSea.nc",
-         "results/IBM_1978_station_Iceland.nc"]
+stations1968=["results/IBM_1993_station_EastandWestGreenland.nc",
+              "results/IBM_1993_station_Lofoten.nc",
+              "results/IBM_1993_station_GeorgesBank.nc",
+              "results/IBM_1993_station_NorthSea.nc",
+              "results/IBM_1993_station_Iceland.nc"]
 
-stations1993=["results/IBM_1978_station_Lofoten.nc",
-         "results/IBM_1978_station_GeorgesBank.nc",
-         "results/IBM_1978_station_NorthSea.nc",
-         "results/IBM_1978_station_Iceland.nc"]
+stations1993=["results/IBM_1993_station_EastandWestGreenland.nc",
+              "results/IBM_1993_station_Lofoten.nc",
+              "results/IBM_1993_station_GeorgesBank.nc",
+              "results/IBM_1993_station_NorthSea.nc",
+              "results/IBM_1993_station_Iceland.nc"]
 
-stationNames=["Lofoten","Georges Bank","North Sea","Iceland"]
-
-#stations1968=["results/IBM_1978_station_NorthSea.nc"]
-#stations1993=["results/IBM_1978_station_NorthSea.nc"]
-
-#stationNames=["North Sea"]
+stationNames=["East Greenland","Lofoten","Georges Bank","North Sea","Iceland"]
 
 
 co=["blue","red"]
@@ -38,7 +35,7 @@ years=[1968,1993]
 stName=0
  
 for station1968, station1993 in zip(stations1968,stations1993):
-    print "Comparing two stations :"
+    print "Comparing station at two different years:"
     print "1->%s"%(station1968)
     print "2->%s\n"%(station1993)
     st=[]
