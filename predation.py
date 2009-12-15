@@ -40,15 +40,15 @@ def FishPredAndStarvation(FishDens,Larval_m,Larval_wgt,attCoeff,Ke,Eb,seconds):
     """Calculate lethal encounter rate with fish setMort is either 0 (off) or 1 (on)"""
     FishMortality = setMort*(VisFieldShape*np.pi*(VisualRange**2)*FishSwimVel*FishDens)
     InvertebrateMortality = (setMort*(Ambush*OtherPred(Larval_m,aPred,bPred) + (1.-Ambush)*OtherPred(Larval_m,aPred,bPred)))
+    Starved=aliveOrDead(Larval_wgt, Larval_m)
 
-    Mortality = (InvertebrateMortality + FishMortality + aliveOrDead(Larval_wgt, Larval_m)*StarvationMortality)*seconds
+    Mortality = (InvertebrateMortality + FishMortality + Starved*StarvationMortality)*seconds
     
-    #print InvertebrateMortality, FishMortality, aliveOrDead(Larval_wgt, Larval_m)*StarvationMortality
-    return Mortality
+    #print 'inv', InvertebrateMortality, 'fish',FishMortality, 'starv',aliveOrDead(Larval_wgt, Larval_m)*StarvationMortality
+    return Mortality, Starved
 
 def OtherPred(L_m,aPred,bPred):     
     """Calculate death risk from other sources"""
-
     OtherPred = aPred*(L_m*m2mm)**bPred
 
     return OtherPred
@@ -58,28 +58,22 @@ def WeightAtLength(L_m):
     return (np.exp(-9.38+4.55*np.log(L_m*m2mm)-0.2046*(np.log(L_m*m2mm))**2.))*1000.   
 
 def aliveOrDead(Larval_wgt, Larval_m):
-    """For a given length, the weight should be a given reference weight"""
+    """For a given length, the weight should be a given reference weight. If the weight is
+    less than regular weight at length, then we assume staarvation is occurring. If the weight
+    is less than 70% (deadThreshold - initLarva.py) of the weight it should have at length we assume the larvae is dead
+    and massively increase the mortality rate to reflect death.
+    
+    Trond Kristiansen, 02.12.2009"""
+    
     refWeight = WeightAtLength(Larval_m)
-    
-    if (refWeight > Larval_wgt*1000.): starvation=1
-    else: starvation=0
-    
-    return starvation
+    if (refWeight > Larval_wgt*1000.):
+        starvation=1
+        #print 'starvation %s refWgt: %s wgt: %s'%(starvation,refWeight, Larval_wgt*1000.)
+    else:
+        starvation=0
+        
+    if (refWeight*deadThreshold > Larval_wgt*1000.):
+        starvation = 2
+        #print 'Larva died of starvation'
 
-  #  !---------------------------------------------------------------------------------
-  #  ! If the larvae length is less than 70% of the potential length (unlimited food).
-  #  ! the larvae is dead.
-  #  if (ref_weight*starvation_threshold > this%wgt) then
-  #     this%alive = 0
-  #     if (EstBetaAtStages==1) then
-  #        this%stage_hours=max_stage_hours
-  #     end if
-  #  else
-  #     this%alive=1
-  #  End If
-  #  !---------------------------------------------------------------------------------
-  #  If (this%alive .Eq. 0) Then
-  #     !Print *, 'cod larva died of starvation', this%potential_weight,this%wgt
-  #  End If
-  #  !
-  #End Subroutine alive_or_dead
+    return starvation

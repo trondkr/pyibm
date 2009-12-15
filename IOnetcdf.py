@@ -6,11 +6,11 @@ import datetime as dt
 __author__   = 'Trond Kristiansen'
 __email__    = 'trond.kristiansen@imr.no'
 __created__  = dt.datetime(2008, 6, 10)
-__modified__ = dt.datetime(2009, 6, 19)
+__modified__ = dt.datetime(2009, 12, 2)
 __version__  = "1.2"
 __status__   = "Production"
 
-def getStationData(cdf, varlist, grdSTATION, log, clim):
+def getStationData(cdf, varlist, grdSTATION, log, clim, stationName):
     """
     This routine reads a netCDF4 file created using IOstation.py in soda2roms. Such
     a file only contain information for one lat/long location and is therefore different
@@ -44,7 +44,7 @@ def getStationData(cdf, varlist, grdSTATION, log, clim):
         """
         
         if log is True:
-            print "\n---> Extracting time series of %s from station"%(var)
+            print "\n---> Extracting time series of %s from station %s"%(var,stationName)
             if var in ["taux","tauy","ssh"]:
                 print '---> Maximum %s %f'%(var, var_array_rawXY[:,int(var_numberXY-1)].max())
                 print '---> Minimum %s %f'%(var, var_array_rawXY[:,int(var_numberXY-1)].min())    

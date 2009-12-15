@@ -20,9 +20,12 @@ Variables that are imported to ibm.py using from initLarva import *
 more than total number of simulation days : see function init in ibm.py"""
 NReleaseDatesInit=30
 daysBetweenReleases=14
-Nlarva=1
+Nlarva=10
 NDaysAlive=30
 Nprey=1
+initWgt=0.080 #wgt in milligrams
+initDepth=0
+randomWgt=1 #1=on, 0=off Initialize weight with random values from initWgt
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
 MultiplyPrey=20
 
@@ -41,6 +44,7 @@ ltr2mm3 = 1e-6
 micro2m = 0.001
 contrast = 0.4 #Inherent contrast after Fiksen,02
 mm2m = 0.001
+mg2ug=1000.0
 C2 = 0.05                     
 act = 1
 a = (0.01/3600.)*dt;            
@@ -51,6 +55,7 @@ Ke_predator = 1
 attCoeff = 0.18
 Nhours =24
 FishDens = 0.0001	#Predation from fish depends on density of predators
+deadThreshold=0.7   #Individuals die if weight is less than 70% of regular weight at length: predation.py
 
 """ Initialize Calanus """
 calanus_D  = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
