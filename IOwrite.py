@@ -5,7 +5,7 @@ import numpy as np
 import time
 import os
 
-def writeStationFile(dh,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex):
+def writeStationFile(deltaH,deltaZ,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex):
      
      f1 = Dataset(outputFile, mode='w', format='NETCDF4')
      f1.description="This is a IBM result file for a given station"
@@ -26,10 +26,15 @@ def writeStationFile(dh,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,
      v_time.field = 'time, scalar, series'
      v_time.calendar='standard'
      
-     v=f1.createVariable('dh','d')
+     v=f1.createVariable('deltaH','d')
      v.long_name = "Hours per timestep" ;
      v.units = "1.0/hour"
-     v[:]=dh
+     v[:]=deltaH
+     
+     v=f1.createVariable('deltaZ','d')
+     v.long_name = "Vertical increments allowed for behavior" ;
+     v.units = "meter"
+     v[:]=deltaZ
      
      v=f1.createVariable('wgt', 'f', ('cohort','larva','time','prey'),zlib=True)
      v.long_name = "Weight at day of year , depth, given prey"

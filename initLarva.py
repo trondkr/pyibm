@@ -21,10 +21,10 @@ more than total number of simulation days : see function init in ibm.py"""
 NReleaseDatesInit=5
 daysBetweenReleases=30
 Nlarva=1
-NDaysAlive=30
+NDaysAlive=5
 Nprey=1
-initWgt=0.300 #wgt in milligrams
-initDepth=0
+initWgt=0.090 #wgt in milligrams
+initDepth=0.1
 randomWgt=0 #1=on, 0=off Initialize weight with random values from initWgt
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
 MultiplyPrey=50
@@ -50,7 +50,7 @@ act = 1
 a = (0.01/3600.)*dt;            
 b = -1.3 
 Pe = 0                        
-Ke_larvae = 5
+Ke_larvae = 1
 Ke_predator = 1              
 attCoeff = 0.18
 beamAttCoeff=attCoeff*3.0
@@ -59,9 +59,15 @@ FishDens = 0.0001	#Predation from fish depends on density of predators
 deadThreshold=0.7   #Individuals die if weight is less than 70% of regular weight at length: predation.py
 
 """Here you define how many time steps you want per 24 hours"""
-dt_per_day=24
-dh = 24./(dt_per_day*1.0)	#Hours per timestep
+dt_per_day=240
+deltaH = 24./(dt_per_day*1.0)	#Hours per timestep
    
+"""Here you define the vertical resolution of behavior and movement meter
+deltaZ=0.1 = 10 cm increments, deltaZ=0.05 is 5 cm increments. If resolution is less than 1 meter,
+make sure that lastDecimal is larger than zero. lastDecimal=1 : 0.56=>0.6"""
+deltaZ=0.2
+lastDecimal=1
+
 """ Initialize Calanus """
 calanus_D  = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
 calanus_W  = [0.33, 0.49, 1., 1.51,2.09, 2.76, 4.18, 13.24, 23.13, 63.64, 169.58, 276.29, 276.29] #(micrograms)
