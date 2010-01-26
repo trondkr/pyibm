@@ -25,14 +25,17 @@ import date
 import IOnetcdf
 import predation
 from initLarva import *
+"""Import f2py Fortran modules"""
+import calclight
+import perception
 
 __author__   = 'Trond Kristiansen'
 __email__    = 'trond.kristiansen@imr.no'
 __created__  = datetime.datetime(2008, 6, 9)
-__modified__ = datetime.datetime(2009, 12, 2)
+__modified__ = datetime.datetime(2010, 1, 19)
 __version__  = "1.1.5"
 __status__   = "Production"
-__revisions__= "8.6.09, 2.12.09"
+__revisions__= "8.6.09, 2.12.09, 19.01.10"
 
 def help():
     """
@@ -53,16 +56,24 @@ def init(station,stationName):
     Finish      = False
     fileNameIn  = station
 
+    """Option for using seawifs data as prey abundance"""
+    seawifs=True
+    seawifsFileName="/Users/trond/Projects/seawifs/chlo-stations.nc"
+    if seawifs==True:
+        seawifsArray=getSeaWifs(seawifsFileName)
+    else:
+        seawifsArray=None
+        
     """Open the netcdf file if it existst."""
     cdf = Dataset(fileNameIn)
-   
+  
     """Calculate the sigma to meters matrix. This is important as all variables in the netcdf file are stored
     at sigma layers. To be able to convert from sigma to meters we use this function."""
     grdSTATION = grd.grdClass(fileNameIn,"STATION")
     
     varlist=['temp','salt','u','v','taux','tauy'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
-    startDate = datetime.datetime(1993,1,1,0,0,0)
-    endDate   = datetime.datetime(1994,1,1,0,0,0)
+    startDate = datetime.datetime(1970,4,1,0,0,0)
+    endDate   = datetime.datetime(1971,5,1,0,0,0)
     
     """Get the time information and find the indices for start and stop data to extract relative to
     the time period wanted. Takes input data:
@@ -104,13 +115,14 @@ def init(station,stationName):
     print "-----------------------------------------------------------------"                       
     
     
-    """Get the total number of hours so that we can use this number to create arrays.
-    If timestep is different from hour , this needs to be changed"""
+    """Get the total number of hours so that we can use this number to create arrays."""
     delta=(endDate - startDate)
-    grdSTATION.delta=int(delta.days*24.)
+    grdSTATION.delta=int((delta.days + 1./24.)*(24./dh))
     grdSTATION.endDate=endDate
+    grdSTATION.seawifs=seawifs
+    grdSTATION.stationNumber=0
     
-    return grdSTATION, clim, outputFile, NReleaseDates, Finish
+    return grdSTATION, clim, outputFile, NReleaseDates, Finish, seawifsArray
 
 def findActiveCohorts(isDead,isReleased):
     co=0; co2=0
@@ -165,7 +177,17 @@ def isAlive(julian,larvaAge,cohort,ind,t,prey,startAndStopIndex,isDead,grdSTATIO
    
     return isAliveBool, grdSTATION
     
-       
+def getSeaWifs(seawifsFileName):
+    """Note that the oder of the station data read from seawifs file needs to
+    correspond to the order of stations calulcated and defined in main funtion!!!"""
+    file = Dataset(seawifsFileName)
+    print "SEAWIFS data -------------------------------------------"
+    print "Extracting seawifs data from file %s"%(seawifsFileName)
+    print "%s"%(file.stations)
+    seawifsArray = file.variables['Chlorophyll-a']
+   
+    return seawifsArray
+    
 def getDepthIndex(grdSTATION,depth):
     depthFOUND=False; d=0
     while d < len(grdSTATION.depth) and depthFOUND==False:
@@ -202,18 +224,20 @@ def initBehavior(depth,maxHourlyMove):
     
     return oldDepth,optDepth,h_start,h_stop,NOptDepths,fitness
 
+
 def getBehavior(stomachFullness,F,m,length,oldFitness,depth,optDepth):
     """Rule 4 of Behavioral Ecology paper - Kristiansen et al. 2009"""
-    T=min(1.0,0.3+1000.0*(1+(length*m2mm)*np.exp(length*m2mm))**(-1))
-    
+    T=min(1.0,0.3+1000.0*(1+(length)*np.exp(length))**(-1))
+
     if stomachFullness > T:
         beta   = 7.0
         vector = ((stomachFullness-T)/(1.0-T))**beta
     else: vector=0.0
+    
     fitness=(((1-vector)*F) - vector*m)
-  
+    #print "Vector %s new depth %s vs old depth %s : new fit %s and old %s "%(vector,optDepth,depth,fitness,oldFitness) 
     if fitness >= oldFitness:
-      #  print "Vector %s new depth %s vs old depth %s : new fit %s and old %s "%(vector,optDepth,depth,fitness,oldFitness) 
+        #print "Change: Vector %s new depth %s vs old depth %s : new fit %s and old %s "%(vector,optDepth,depth,fitness,oldFitness) 
         optDepth=depth
         oldFitness=fitness
     
@@ -286,13 +310,30 @@ def calculateLength(Larval_wgt, Larval_m):
         #print 'Kept the old length', oldLarval_m, Larval_m
     return Larval_m
 
-def calculateGrowth(depth,hour,grdSTATION,dt,Larval_wgt, Larval_m,
+def calculateGrowth(dh,depth,hour,grdSTATION,dt,Larval_wgt, Larval_mm,
                     julian,julianIndex,julianFileA,julianFileB,
                     R,enc,hand,ing,pca,Spre,prey):
     
-    s_light = IOlight.surfaceLight(grdSTATION,julian,grdSTATION.lat,hour)
-    Eb = s_light*np.exp(attCoeff*(-depth))
-    #print "Light level: %s and surface %s"%(Eb,s_light)
+    """==>LIGHT calculations===============================
+    If you have fortran compiler use this light routine:"""
+    radfl0=0.0; maxLight=0.0; cawdir=0.0; clouds=0.0; sunHeight=0.0; surfaceLight=0.0
+   
+    gtime=grdSTATION.refDate + datetime.timedelta(seconds=julian)
+    tt = gtime.timetuple()
+    dayOfYear = float(tt[7])
+    hourOfDay = float(tt[3])
+    daysInYear=365.0
+    
+    radfl0,maxLight,cawdir = calclight.calclight.qsw(radfl0,maxLight,cawdir,clouds,grdSTATION.lat*np.pi/180.0,dayOfYear,daysInYear)
+    maxLight = maxLight/0.217 # Convert from W/m2 to umol/m2/s-1
+    sunHeight, surfaceLight = calclight.calclight.surlig(hourOfDay,maxLight,dayOfYear,grdSTATION.lat,sunHeight,surfaceLight)
+    
+    """If you don't have fortran compiler:"""     
+    #surfaceLight = IOlight.surfaceLight(grdSTATION,julian,grdSTATION.lat,hour)
+    
+    Eb = surfaceLight*np.exp(attCoeff*(-depth))
+    
+    """==>INDEX calculations==============================="""
     depthIndex1, depthIndex2, dz1, dz2 = getDepthIndex(grdSTATION,depth)
     Tdata,Sdata,Udata,Vdata,windX,windY = getData(julian,julianIndex,julianFileA,
                                       julianFileB,dz1,dz2,depthIndex1,
@@ -300,45 +341,53 @@ def calculateGrowth(depth,hour,grdSTATION,dt,Larval_wgt, Larval_m,
                         
     """Mouthsize of larvae. The larvae can only capture calanus of sizes less
     than the larval mouthsize. Folkvord et al."""
-    m = np.exp (-3.27+1.818*np.log(Larval_m)-0.1219*(np.log(Larval_m))**2.)
-    
+    m = np.exp (-3.27+1.818*np.log(Larval_mm)-0.1219*(np.log(Larval_mm))**2.)
     # Betsys larval length in mm (2-10mm) :  m2=0.1260 + 0.1714*SL(:) 
-    meta = dt*2.38e-7*np.exp(0.088*7)*((Larval_wgt*mg2ug)**(0.9)*0.001)
+    meta = dt*2.38e-7*np.exp(0.088*7)*((Larval_wgt*mg2ug)**(0.9)*0.001)*dh
+    """Increase metabolism during active hours (light above threshold) Lough et  al. 2005"""
     if Eb > 0.001:
-        if Larval_m > 5.5: meta = (2.5*meta)
+        if Larval_mm > 5.5: meta = (2.5*meta)
         else: meta = (1.4*meta)
-
-    assi = 0.8*(1.0 - 0.4*np.exp(-0.002*(Larval_wgt/mm2m-30.0)))
+    """Calculate assimilation efficiency"""
+    assi=0.8*(1-0.400*exp(-0.002*(Larval_wgt*mg2ug-50.0)))
+      
     GR = max(0.0, sec2day*np.log(0.01*(1.08 + 1.79*Tdata - 0.074*Tdata*np.log(Larval_wgt)
                               - 0.0965*Tdata*np.log(Larval_wgt)**2
-                              + 0.0112*Tdata*np.log(Larval_wgt)**3) + 1)*dt)
+                              + 0.0112*Tdata*np.log(Larval_wgt)**3) + 1)*dt*dh)
     
     GR_gram = (np.exp(GR) - 1)*Larval_wgt
-                   
-    Em = Larval_m**2/(contrast*0.1*0.2*0.75) #Size-specific sensitivity of the visual system (Fiksen,02)
+         
     """ Calculate seasonal prey density based on temperature"""
     if Tdata < 0.5*grdSTATION.maxT:
         P=(Tdata - grdSTATION.minT) / (0.5*grdSTATION.maxT - grdSTATION.minT)    
     else: P=1
-    P = P * grdSTATION.ratioOfMaxLight
+    #P = P * grdSTATION.ratioOfMaxLight
+    P = grdSTATION.relativeSeawifsValue
+   
+    """==>PERCEPTION of PREY calculations==============================="""          
+    Em = (Larval_mm**2.0)/(contrast*0.1*0.2*0.75) #Size-specific sensitivity of the visual system (Fiksen,02)
     
-    #for j in range(2):
+    #for j in range(6):
     j=1
-    Ap_calanus = 0.75*calanus_L1[j]*mm2m*calanus_L2[j]*mm2m
-    R[j] = (IOlight.getPerceptionDistance(Em,attCoeff,Ke_larvae,Ap_calanus,Eb))*m2mm
+    IER=0; R[j]=0.0 #R[j]=np.sqrt(Em*contrast*(calanus_Area[j])*(Eb/(Ke_larvae+Eb)))
+    """All input to getr is either in m (or per m), or in mm (or per mm)"""
+    R[j], IER = perception.perception.getr(R[j],beamAttCoeff/m2mm,contrast,calanus_Area[j],Em,Ke_larvae,Eb, IER)
+   
+    """If you don't have fortran compiler use python routine for visual range"""
+    #visual = np.sqrt(Em*contrast*(Ap_calanus*m2mm)*(Eb/(Ke_larvae+Eb)))
+    #R[j] = (IOlight.getPerceptionDistance(Em,attCoeff,Ke_larvae,Ap_calanus,Eb))*m2mm
     
     epsilon=(5.82*1.E-9*((np.sqrt(windX**2 + windY**2)))**3.)/(depth+0.1)
     
     omega = 1.9*(epsilon*R[j]*mm2m)**0.667
     omega =  omega * m2mm # From m/s to mm/s
-    #print 'turbulence mm/s', omega, windX, windY, depth
-    hand[j] = 0.264*10**(7.0151*(calanus_L1[j]/Larval_m)) # Walton 1992
-    enc[j] = (0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * (calanus_D[j]*((prey+1)*MultiplyPrey*P))* ltr2mm3
-    pca[j] = enc[j]*max(0.0,min(1.0,-16.7*(calanus_L1[j]/Larval_m) + 3.0/2.0))
-  
-    ing[j] = dt*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]);
-    #print 'ing',ing[j], GR_gram,  grdSTATION.ratioOfMaxLight, (prey+1)*MultiplyPrey*P, omega
-   
+
+    hand[j] = 0.264*10**(7.0151*(calanus_L1[j]/Larval_mm)) # Walton 1992
+    enc[j] = ((0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * (calanus_D[j]*((prey+1)*MultiplyPrey*P))* ltr2mm3)
+    pca[j] = enc[j]*max(0.0,min(1.0,-16.7*(calanus_L1[j]/Larval_mm) + 3.0/2.0))
+    
+    ing[j] = (dt*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]))*dh
+    
     stomachFullness =  (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size)
     
     return ing,GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness
@@ -512,13 +561,16 @@ def updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim
     
     return julianFileA, julianFileB, julianIndex, Finish
 
+def showProgress(t,Ntime,message):
+    p=int( ((t*1.0)/(1.0*(Ntime-24)))*100.)
+    progress.render(p,message)
 
-def ibm(station,stationName):
+def ibm(station,stationName,stationNumber):
     
     """
     Read the netcdf file and create the input arrays needed by the ibm
     """
-    grdSTATION, clim, outputFile, Ncohorts, Finish = init(station,stationName)
+    grdSTATION, clim, outputFile, Ncohorts, Finish, seawifsArray = init(station,stationName)
     
     """Start time in days, hours, and seconds since 1948,1,1"""
     time=grdSTATION.start_date - grdSTATION.refDate 
@@ -531,7 +583,7 @@ def ibm(station,stationName):
     julian=time.days*86400 + time.seconds
     julianFileA=grdSTATION.time[0]*86400
     julianFileB=grdSTATION.time[1]*86400
-    Ntime=grdSTATION.delta # Number of hours to use in arrays
+    Ntime=int(grdSTATION.delta) # Number of hours to use in arrays
    
     if clim is True:
         julianFileA=grdSTATION.time[0]
@@ -599,6 +651,16 @@ def ibm(station,stationName):
         oldT=t
         release=[];isReleased=[];releaseDate=[]
         
+        if grdSTATION.seawifs is True:
+            seawifsDate=grdSTATION.refDate + datetime.timedelta(seconds=julian)
+            """Months goes from 1-12, so index needs to extract one"""
+            index=int(seawifsDate.month) - 1
+            maxSeawifsValue=seawifsArray[stationNumber,:].max()
+            seawifsValue = seawifsArray[stationNumber,index]
+            grdSTATION.relativeSeawifsValue = seawifsValue / maxSeawifsValue
+            #print "Food availability is defined by seawifs for month %i and station %s: %s"%(index+1,stationNumber,grdSTATION.relativeSeawifsValue)
+           #TODO: add seawifs relative prey value to calculateGrowth function
+            
         """loop over all the cohorts of interest"""
         noOneLeft=True
         for cohort in range(Ncohorts):
@@ -644,28 +706,31 @@ def ibm(station,stationName):
                         else:
                             noOneLeft=False
                          
-                            for hour in range(Nhours):
-                           
+                            for hour in range(dt_per_day):
+                                """Since we split hour into parts, the new hour variable is h"""   
+                                h = dh*1.0*hour
+                        
                                 swimSpeed=0.261*(L[cohort,ind,t-1,prey]**(1.552*L[cohort,ind,t-1,prey]**(0.920-1.0)))-(5.289/L[cohort,ind,t-1,prey])
-                                maxHourlyMove=(swimSpeed*(dt/1000.))/4.0 # Divided by four compared to original IBM in fortran
+                                maxHourlyMove=((swimSpeed*(dt/1000.))/4.0)*dh # Divided by four compared to original IBM in fortran
                               
                                 oldDepth,optDepth,h_start,h_stop,NOptDepths,oldFitness = initBehavior(depth,maxHourlyMove)
                                
                                 for findDepth in range(NOptDepths+1):
                                     depth=h_start+findDepth
-                                    
+                                   
                                     """Calculate growth at the current depth layer"""
-                                    ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness = calculateGrowth(depth,hour,grdSTATION,dt,W[cohort,ind,t-1,prey],
+                                    ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness = calculateGrowth(dh,depth,h,grdSTATION,dt,W[cohort,ind,t-1,prey],
                                                                                                          L[cohort,ind,t-1,prey],julian,julianIndex,
                                                                                                          julianFileA,julianFileB,R,enc,hand,ing,pca,
                                                                                                          S[cohort,ind,t-1,prey],prey)
                                     
                                     """Calculate mortality at the current depth layer"""
-                                    mortality, didStarve = predation.FishPredAndStarvation(FishDens,L[cohort,ind,t-1,prey]*mm2m,W[cohort,ind,t-1,prey],
+                                    mortality, didStarve = predation.FishPredAndStarvation(dh,FishDens,L[cohort,ind,t-1,prey]*mm2m,W[cohort,ind,t-1,prey],
                                                                                 attCoeff,Ke_predator,Eb,dt)
                                   
                                     """Calculate fitness at the current depth layer"""
                                     F = sum(ing)/W[cohort,ind,t-1,prey]
+
                                     
                                     optDepth,oldFitness = getBehavior(stomachFullness,
                                                                  F,mortality,L[cohort,ind,t,prey],
@@ -675,12 +740,12 @@ def ibm(station,stationName):
                                 depth=optDepth
                                 
                                 """Now recalculate the growth and mortality at the optimal depth layer"""
-                                ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness = calculateGrowth(depth,hour,grdSTATION,dt,W[cohort,ind,t-1,prey],
+                                ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness = calculateGrowth(dh,depth,h,grdSTATION,dt,W[cohort,ind,t-1,prey],
                                                                                                      L[cohort,ind,t-1,prey],julian,julianIndex,
                                                                                                      julianFileA,julianFileB,R,enc,hand,ing,pca,
                                                                                                      S[cohort,ind,t-1,prey],prey)
                                 
-                                mortality, didStarve = predation.FishPredAndStarvation(FishDens,L[cohort,ind,t-1,prey]*mm2m,
+                                mortality, didStarve = predation.FishPredAndStarvation(dh,FishDens,L[cohort,ind,t-1,prey]*mm2m,
                                                                                        W[cohort,ind,t-1,prey],attCoeff,
                                                                                        Ke_predator,Eb,dt)
                                
@@ -698,13 +763,16 @@ def ibm(station,stationName):
                                 if didStarve > 1: larvaPsur[cohort,ind,t,prey]=0.0
                                 else:larvaPsur[cohort,ind,t,prey]=larvaPsur[cohort,ind,t-1,prey]*(np.exp(-mortality))
                                 
-                                #print 'Probability of survival at depth : %3.2f for hour %s => %6.2f'%(depth,t,larvaPsur[cohort,ind,t,prey]*100.)
+                                print 'Prob.survival at depth : %3.2f for time %s => %6.2f for size %s'%(depth,
+                                                                                            grdSTATION.refDate + datetime.timedelta(seconds=julian + dt*dh)
+                                                                                            ,larvaPsur[cohort,ind,t,prey]*100.,
+                                                                                            L[cohort,ind,t,prey])
                                 
                                 SGR[cohort,ind,t,prey]=((W[cohort,ind,t,prey]-W[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey])*100.0
                                 
                                 if ind==0 and cohort==minNumberOfActiveCohort and prey==0: #releasedCohorts-1:
                                     larvaTime.append(julian/3600.)
-                               
+                                    
                                 julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim)
                                    
                                 s1=int(startAndStopIndex[cohort,ind,0])
@@ -712,8 +780,9 @@ def ibm(station,stationName):
                                 Age[cohort,ind,prey] =julian/3600.-larvaTime[s1]
                                 
                                 """Update time"""
-                                currentDate=grdSTATION.refDate + datetime.timedelta(seconds=julian + dt)
-                                delta=currentDate - grdSTATION.refDate 
+                                currentDate=grdSTATION.refDate + datetime.timedelta(seconds=julian + dt*dh)
+                                delta=currentDate - grdSTATION.refDate
+                                 
                                 julian=delta.days*86400 + delta.seconds
                                 t +=1
                              
@@ -723,17 +792,20 @@ def ibm(station,stationName):
                             if now == grdSTATION.endDate or now == last:
                                
                                 if ind==(Nlarva-1) and cohort==(releasedCohorts-1) and prey==(Nprey-1):
+                                    message='---> Finished IBMtime on date: %s. Writing results to file....'%(grdSTATION.refDate + datetime.timedelta(seconds=julian))
+                                    showProgress(t,Ntime,message)
+                                    
                                     startAndStopIndex[cohort,:,1]=t
-                                    IOwrite.writeStationFile(grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex)
+                                    IOwrite.writeStationFile(dh,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex)
                                     move(outputFile, "results/"+outputFile)
-                                  
-                                    print "Result file is saved as %s"%("results/"+outputFile)
                                     loopsDone = True
+                                    
+                                    print "Result file is saved as %s"%("results/"+outputFile)
                                     break
                                     
                             if ind==(Nlarva-1) and cohort==(releasedCohorts-1) and prey==(Nprey-1):
                                 julian=julian
-                               # print "Current date updates", currentDate, prey,ind,cohort
+
                                 t=t
                             else:
                                 julian=oldJulian
@@ -744,9 +816,7 @@ def ibm(station,stationName):
         if loopsDone is False:
             """Show progress indicator"""
             message='---> running IBMtime-step %s of %s with %s released cohorts (%s finished)'%(t,grdSTATION.refDate + datetime.timedelta(seconds=julian),releasedCohorts,minNumberOfActiveCohort)
-            p=int( ((t*1.0)/(1.0*(Ntime-24)))*100.)
-            progress.render(p,message)
-       
+            showProgress(t,Ntime,message)
     
 if __name__=="__main__":
    
@@ -757,17 +827,20 @@ if __name__=="__main__":
     except ImportError:
         pass
     
-    stations=["/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_EastandWestGreenland.nc",
-              "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_GeorgesBank.nc",
-              "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_Lofoten.nc",
+    stations=["/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_Iceland.nc",
               "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_NorthSea.nc",
-              "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_Iceland.nc"]
-    stationNames=["East and West Greenland", "Georges Bank", "Lofoten", "North Sea", "Iceland"]
-    
+              "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_EastandWestGreenland.nc",
+              "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_Lofoten.nc",
+              "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_GeorgesBank.nc"]
+    """Notice that if you use seawifs data, the order of the stations here have to match
+    the order of station seawifs data in seawifs file"""
+    stationNames=['North Sea', 'Iceland', 'East Greenland', 'Lofoten', 'Georges Bank']
+    stationNumber=0
+
    # stations=["/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_NorthSea.nc"]
    # stationNames=["North Sea"]
     
     for station, stationName in zip(stations,stationNames):
         
-        ibm(station, stationName)
-  
+        ibm(station, stationName, stationNumber)
+        stationNumber+=1

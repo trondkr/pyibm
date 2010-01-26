@@ -15,17 +15,17 @@ __status__   = "Development"
 
 missingValue=-9.99e-35
 
-stations1968=["results/IBM_1993_station_EastandWestGreenland.nc",
-              "results/IBM_1993_station_Lofoten.nc",
-              "results/IBM_1993_station_GeorgesBank.nc",
-              "results/IBM_1993_station_NorthSea.nc",
-              "results/IBM_1993_station_Iceland.nc"]
+stations1968=["results/IBM_1970_station_EastandWestGreenland.nc",
+              "results/IBM_1970_station_Lofoten.nc",
+              "results/IBM_1970_station_GeorgesBank.nc",
+              "results/IBM_1970_station_NorthSea.nc",
+              "results/IBM_1970_station_Iceland.nc"]
 
-stations1993=["results/IBM_1993_station_EastandWestGreenland.nc",
-              "results/IBM_1993_station_Lofoten.nc",
-              "results/IBM_1993_station_GeorgesBank.nc",
-              "results/IBM_1993_station_NorthSea.nc",
-              "results/IBM_1993_station_Iceland.nc"]
+stations1993=["results/IBM_1970_station_EastandWestGreenland.nc",
+              "results/IBM_1970_station_Lofoten.nc",
+              "results/IBM_1970_station_GeorgesBank.nc",
+              "results/IBM_1970_station_NorthSea.nc",
+              "results/IBM_1970_station_Iceland.nc"]
 
 stationNames=["East Greenland","Lofoten","Georges Bank","North Sea","Iceland"]
 
@@ -67,7 +67,8 @@ for station1968, station1993 in zip(stations1968,stations1993):
         sgr      =cdf.variables["sgr"][:,:,:,:]
         length   =cdf.variables["length"][:,:,:,:]
         survival =cdf.variables["survival_probability"][:,:,:,:]
-    
+        dh       =cdf.variables["dh"][:]
+         
         Ncohorts=len(depth[:,0,0,0])
         Nindividuals=len(depth[0,:,0,0])
         print "Number of individuals %s and cohorts %s"%(Nindividuals, Ncohorts)
@@ -77,8 +78,8 @@ for station1968, station1993 in zip(stations1968,stations1993):
             if index2==missingValue:
                 index2=len(timeIndex-1)
            
-            days=int((index2-index1)/24)
-            
+            days=int((index2-index1)/(24.0/dh))
+        
             meanSGR24H    =np.zeros((days),dtype=float64)
             meanIndSGR24H =np.zeros((Nindividuals,days),dtype=float64)
             stdSGR24H     =np.zeros((days),dtype=float64)
@@ -92,12 +93,13 @@ for station1968, station1993 in zip(stations1968,stations1993):
             maximum=-99999
             
             for i in range(days):
-                k1=index1+i*24
-                k2=index1+(i+1)*24
-               
+                k1=(index1+i*24./float(dh)) -1
+                k2=(index1+(i+1)*24./float(dh)) -1
+                print 'range',k1,k2, sgr.shape, cohort,prey, Nindividuals
                 meanSGR24H[i] = sum(sgr[cohort,:,k1:k2,prey])/Nindividuals
                 j=0
                 for j in range(Nindividuals):
+    
                     meanIndSGR24H[j,i] = sum(sgr[cohort,j,k1:k2,prey])
                     
                     if sum(sgr[cohort,j,k1:k2,prey])> maximum:
@@ -118,7 +120,6 @@ for station1968, station1993 in zip(stations1968,stations1993):
                 stdMinus[i] = meanSGR24H[i] - stdSGR24H[i]
                 stdPlus[i]  = meanSGR24H[i] + stdSGR24H[i]
 
-
          #   sgr24H[cohort,ind,index1:index2,0]= np.convolve(sgr[cohort,ind,index1:index2,0], Ker, mode='same')
             ax.plot(time24H[cohort,:],meanSGR24H,color=co[stNumber],linewidth = 3)
             ax.fill_between(time24H[cohort,:], stdMinus, stdPlus, facecolor=co[stNumber],alpha=0.4)
@@ -136,6 +137,7 @@ for station1968, station1993 in zip(stations1968,stations1993):
         
             index1=int(timeIndex[cohort,0,0])+1
             index2=int(timeIndex[cohort,0,1])-1
+           
             meanLENGTH = mean(length[cohort,:,index1:index2,prey],0)
             rangeLENGTH=np.zeros((len(meanLENGTH),2),dtype=float64)
             minimum=99999
@@ -173,24 +175,24 @@ for station1968, station1993 in zip(stations1968,stations1993):
                 aveT90=aveT90 + np.mean(np.mean(temp[cohort,:,index1:index2,0],1))
                 print "average T %s for cohort %s"%(np.mean(np.mean(temp[cohort,:,index1:index2,0],1)),cohort)
                 t90="1993 (aveT=%2.2f)"%(aveT90/Ncohorts)
-                
-            if cohort==Ncohorts-1 and stNumber==1:
-                tline=[time24H[hh,0] for hh in range(2)]       
-                xline90=[20.5 for hh in range(2)]
-                ax.plot(tline,xline90,color=co[1],linewidth = 4)
-                ax.annotate(t90, xy=(time24H[1,0],20),  xycoords='data',
-                    size=16,
-                    bbox=dict(boxstyle="round", fc=(1.0, 1.0, 1.0), alpha=1.0))
-                
-               
-            if cohort==Ncohorts-1 and stNumber==0:
-                tline=[time24H[hh,0] for hh in range(2)]       
-                xline68=[23.5 for hh in range(2)] 
-                ax.plot(tline,xline68,color=co[0],linewidth = 4)
-                ax.annotate(t68, xy=(time24H[1,0],23),  xycoords='data',
-                    size=16,
-                    bbox=dict(boxstyle="round", fc=(1.0, 1.0, 1.0), alpha=1.0))
             
+            #if cohort==Ncohorts-1 and stNumber==1:
+            #    tline=[time24H[hh,0] for hh in range(2)]       
+            #    xline90=[20.5 for hh in range(2)]
+            #    ax.plot(tline,xline90,color=co[1],linewidth = 4)
+            #    ax.annotate(t90, xy=(time24H[1,0],20),  xycoords='data',
+            #        size=16,
+            #        bbox=dict(boxstyle="round", fc=(1.0, 1.0, 1.0), alpha=1.0))
+            #    
+               
+            #if cohort==Ncohorts-1 and stNumber==0:
+            #    tline=[time24H[hh,0] for hh in range(2)]       
+            #    xline68=[23.5 for hh in range(2)] 
+            #    ax.plot(tline,xline68,color=co[0],linewidth = 4)
+            #    ax.annotate(t68, xy=(time24H[1,0],23),  xycoords='data',
+            #        size=16,
+            #        bbox=dict(boxstyle="round", fc=(1.0, 1.0, 1.0), alpha=1.0))
+            #
             ax.plot(oldtime[index1:index2],meanLENGTH,color=co[stNumber],linewidth = 2)
             stdMinus=mean(length[cohort,:,index1:index2,prey],0) - std(length[cohort,:,index1:index2,prey],0)
             stdPlus=mean(length[cohort,:,index1:index2,prey],0) + std(length[cohort,:,index1:index2,prey],0)

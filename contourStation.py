@@ -13,25 +13,29 @@ __modified__ = datetime.datetime(2009, 6, 18)
 __version__  = "0.1"
 __status__   = "Development"
 
-station="41.5423_-132.9234_res.nc"
-
+station="41.6423_-67.2001_res.nc"
+station="/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_GeorgesBank.nc_res.nc"
+#station="43.4111_-50.4321_res.nc"
 cdf=Dataset(station,"r")
 
 #lon=cdf.variables["lon"][:]
-light=flipud(rot90(cdf.variables["average light"][:,:]))
-depth=cdf.variables["depth"][:]
+light=flipud(rot90(cdf.variables["average_light"][:,:,:,:]))
+depth=cdf.variables["depth"][:,:,:,:]
 time=cdf.variables["time"][:]
-sgr=flipud(rot90(cdf.variables["sgr"][:,:,0]))
-wgt=flipud(rot90(cdf.variables["wgt"][:,:,0]))
-survival=flipud(rot90(cdf.variables["survival probability"][:,:,0]))
-print survival
-sgrrel=flipud(rot90(cdf.variables["sgr relative"][:,:,0]))
-Z=survival
+sgr=flipud(rot90(cdf.variables["sgr"][:,:,:,:]))
+wgt=flipud(rot90(cdf.variables["wgt"][:,:,:,:]))
+length=flipud(rot90(cdf.variables["length"][:,:,:,:]))
+survival=flipud(rot90(cdf.variables["survival_probability"][:,:,:,:]))
+
+sgrrel=flipud(rot90(cdf.variables["sgr_rel"][:,:,:,:]))
+Z=length[:,:,0]
+var='length'
+
 origin = 'lower'
 
 X=time
 Y=-depth
-
+    
 CS = contourf(X, Y, Z,  10,
                         alpha=1.0,
                         cmap=cm.jet,
@@ -41,7 +45,7 @@ CS = contourf(X, Y, Z,  10,
 # the contour levels used for the filled contours.  Alternatively,
 # We could pass in additional levels to provide extra resolution.
 
-CS2 = contour(X, Y, Z, CS.levels[::1],
+CS2 = contour(X, Y, Z, CS.levels,
                         colors = 'k',
                         origin=origin,
                         hold='on')
@@ -52,9 +56,9 @@ ylabel('Depth (m)')
 
 # Make a colorbar for the ContourSet returned by the contourf call.
 cbar = colorbar(CS)
-cbar.ax.set_ylabel('verbosity coefficient')
+cbar.ax.set_ylabel('%s'%(var))
 # Add the contour line levels to the colorbar
 cbar.add_lines(CS2)
-
+plt.axis("tight")
 
 show()

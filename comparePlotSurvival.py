@@ -15,17 +15,17 @@ __status__   = "Development"
 
 missingValue=-9.99e-35
 
-stations1968=["results/IBM_1993_station_EastandWestGreenland.nc",
-              "results/IBM_1993_station_Lofoten.nc",
-              "results/IBM_1993_station_GeorgesBank.nc",
-              "results/IBM_1993_station_NorthSea.nc",
-              "results/IBM_1993_station_Iceland.nc"]
+stations1968=["results/IBM_1970_station_EastandWestGreenland.nc",
+              "results/IBM_1970_station_Lofoten.nc",
+              "results/IBM_1970_station_GeorgesBank.nc",
+              "results/IBM_1970_station_NorthSea.nc",
+              "results/IBM_1970_station_Iceland.nc"]
 
-stations1993=["results/IBM_1993_station_EastandWestGreenland.nc",
-              "results/IBM_1993_station_Lofoten.nc",
-              "results/IBM_1993_station_GeorgesBank.nc",
-              "results/IBM_1993_station_NorthSea.nc",
-              "results/IBM_1993_station_Iceland.nc"]
+stations1993=["results/IBM_1970_station_EastandWestGreenland.nc",
+              "results/IBM_1970_station_Lofoten.nc",
+              "results/IBM_1970_station_GeorgesBank.nc",
+              "results/IBM_1970_station_NorthSea.nc",
+              "results/IBM_1970_station_Iceland.nc"]
 
 stationNames=["East Greenland","Lofoten","Georges Bank","North Sea","Iceland"]
 
@@ -65,14 +65,15 @@ for station1968, station1993 in zip(stations1968,stations1993):
         wgt      =cdf.variables["wgt"][:,:,:,:]
         length   =cdf.variables["length"][:,:,:,:]
         survival =cdf.variables["survival_probability"][:,:,:,:]
-    
+        dh       =cdf.variables["dh"][:]
+        
         Ncohorts=len(depth[:,0,0,0])
         Nindividuals=len(depth[0,:,0,0])
         print "Number of individuals %s and cohorts %s"%(Nindividuals, Ncohorts)
         for cohort in range(Ncohorts):
             index1=int(timeIndex[cohort,0,0])+1
             index2=int(timeIndex[cohort,0,1])-1
-            days=int((index2-index1)/24)
+            days=int((index2-index1)/(24.0/dh))
             
             meanDEPTH24H=np.zeros((days),dtype=float64)
             rangeDEPTH24H=np.zeros((days,2),dtype=float64)
@@ -88,9 +89,10 @@ for station1968, station1993 in zip(stations1968,stations1993):
             maximum=-99999
             
             for i in range(days):
-                k1=index1+i*24
-                k2=index1+(i+1)*24
-               
+                k1=(index1+i*24./float(dh)) -1
+                k2=(index1+(i+1)*24./float(dh)) -1
+                print 'range',k1,k2, survival.shape, cohort,prey, Nindividuals
+                
                 j=0
                 for kk in range(24):
                     
@@ -154,22 +156,22 @@ for station1968, station1993 in zip(stations1968,stations1993):
             widthIndex=index2-index1
             fitness[cohort]=meanPsur[cohort]*(mean(wgt[cohort,:,index2,prey],0))
             
-            if cohort==Ncohorts-1 and stNumber==1:
-                tline=[timePsur1[5] for hh in range(2)]       
-                xline90=[0.04 for hh in range(2)]
-                ax.plot(tline,xline90,color=co[1],linewidth = 4)
-                ax.annotate("1993", xy=(timePsur1[6],0.14),  xycoords='data',
-                    size=16,
-                    bbox=dict(boxstyle="round", fc=co[stNumber], alpha=0.8))
-                
-               
-            if cohort==Ncohorts-1 and stNumber==0:
-                tline=[timePsur1[5] for hh in range(2)]       
-                xline68=[0.03 for hh in range(2)] 
-                ax.plot(tline,xline68,color=co[0],linewidth = 4)
-                ax.annotate("1968", xy=(timePsur1[6],0.17),  xycoords='data',
-                    size=16,
-                    bbox=dict(boxstyle="round", fc=co[stNumber], alpha=0.5))
+            #if cohort==Ncohorts-1 and stNumber==1:
+            #    tline=[timePsur1[5] for hh in range(2)]       
+            #    xline90=[0.04 for hh in range(2)]
+            #    ax.plot(tline,xline90,color=co[1],linewidth = 4)
+            #    ax.annotate("1993", xy=(timePsur1[6],0.14),  xycoords='data',
+            #        size=16,
+            #        bbox=dict(boxstyle="round", fc=co[stNumber], alpha=0.8))
+            #    
+            #   
+            #if cohort==Ncohorts-1 and stNumber==0:
+            #    tline=[timePsur1[5] for hh in range(2)]       
+            #    xline68=[0.03 for hh in range(2)] 
+            #    ax.plot(tline,xline68,color=co[0],linewidth = 4)
+            #    ax.annotate("1968", xy=(timePsur1[6],0.17),  xycoords='data',
+            #        size=16,
+            #        bbox=dict(boxstyle="round", fc=co[stNumber], alpha=0.5))
             
             
             print "Total survival %s for cohort is %s"%(meanPsur[cohort]*100.,cohort)

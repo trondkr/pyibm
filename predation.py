@@ -11,7 +11,7 @@ __version__  = "0.1"
 __status__   = "Production"
 __notes__    = "Converted from Fortran to Python. Based on growth.f90"
 
-def FishPredAndStarvation(FishDens,Larval_m,Larval_wgt,attCoeff,Ke,Eb,seconds):
+def FishPredAndStarvation(dh,FishDens,Larval_m,Larval_wgt,attCoeff,Ke,Eb,seconds):
     """This routine takes larval length in meter as input (Larval_m)"""
     LarvalShape = 0.2		#Larval width:length ratio
     PreyContrast=0.3
@@ -42,7 +42,7 @@ def FishPredAndStarvation(FishDens,Larval_m,Larval_wgt,attCoeff,Ke,Eb,seconds):
     InvertebrateMortality = (setMort*(Ambush*OtherPred(Larval_m,aPred,bPred) + (1.-Ambush)*OtherPred(Larval_m,aPred,bPred)))
     Starved=aliveOrDead(Larval_wgt, Larval_m)
 
-    Mortality = (InvertebrateMortality + FishMortality + Starved*StarvationMortality)*seconds
+    Mortality = (InvertebrateMortality + FishMortality + Starved*StarvationMortality)*seconds*dh
     
     #print 'inv', InvertebrateMortality, 'fish',FishMortality, 'starv',aliveOrDead(Larval_wgt, Larval_m)*StarvationMortality
     return Mortality, Starved
@@ -50,7 +50,6 @@ def FishPredAndStarvation(FishDens,Larval_m,Larval_wgt,attCoeff,Ke,Eb,seconds):
 def OtherPred(L_m,aPred,bPred):     
     """Calculate death risk from other sources"""
     OtherPred = aPred*(L_m*m2mm)**bPred
-
     return OtherPred
 
 def WeightAtLength(L_m):

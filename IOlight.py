@@ -97,7 +97,7 @@ def getPerceptionDistance(Em,k,Ke,Ap,Eb):
     FR1=math.log(((Ke+Eb)/Eb)*r*r*math.exp(c*r))
     
     F1 = FR1-FR2
-    FDER = c + 2./r 
+    FDER = c + 2./(r+0.00000000000001) 
     TOLF = 100. * EPS
     
     for I in range(IEND):
@@ -110,7 +110,7 @@ def getPerceptionDistance(Em,k,Ke,Ap,Eb):
                     FR2=math.log(abs(contrast)*Ap*Em)
                     FR1=math.log(((Ke+Eb)/Eb)*r*r*math.exp(c*r))
                     F1 = FR1-FR2
-                    FDER = c + 2./r 
+                    FDER = c + 2./(r+0.00000000000001) 
                     TOL = EPS
                     AS = abs(r)
                     if (AS-1>0): # if: 4

@@ -18,16 +18,16 @@ Variables that are imported to ibm.py using from initLarva import *
 
 """Number of release dates and cohorts. This will be lowered if NReleaseDatesInit*daysBetweenReleases is
 more than total number of simulation days : see function init in ibm.py"""
-NReleaseDatesInit=30
-daysBetweenReleases=14
-Nlarva=10
+NReleaseDatesInit=5
+daysBetweenReleases=30
+Nlarva=1
 NDaysAlive=30
 Nprey=1
-initWgt=0.080 #wgt in milligrams
+initWgt=0.300 #wgt in milligrams
 initDepth=0
-randomWgt=1 #1=on, 0=off Initialize weight with random values from initWgt
+randomWgt=0 #1=on, 0=off Initialize weight with random values from initWgt
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
-MultiplyPrey=20
+MultiplyPrey=50
 
 missingValue=-9.99e-35
 dt      = 3600                   
@@ -42,7 +42,7 @@ mm2m  = 0.001
 m2mm  = 1000.
 ltr2mm3 = 1e-6
 micro2m = 0.001
-contrast = 0.4 #Inherent contrast after Fiksen,02
+contrast = 0.1 #Inherent contrast after Fiksen,02
 mm2m = 0.001
 mg2ug=1000.0
 C2 = 0.05                     
@@ -50,19 +50,28 @@ act = 1
 a = (0.01/3600.)*dt;            
 b = -1.3 
 Pe = 0                        
-Ke_larvae = 1
+Ke_larvae = 5
 Ke_predator = 1              
 attCoeff = 0.18
+beamAttCoeff=attCoeff*3.0
 Nhours =24
 FishDens = 0.0001	#Predation from fish depends on density of predators
 deadThreshold=0.7   #Individuals die if weight is less than 70% of regular weight at length: predation.py
 
+"""Here you define how many time steps you want per 24 hours"""
+dt_per_day=24
+dh = 24./(dt_per_day*1.0)	#Hours per timestep
+   
 """ Initialize Calanus """
 calanus_D  = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
 calanus_W  = [0.33, 0.49, 1., 1.51,2.09, 2.76, 4.18, 13.24, 23.13, 63.64, 169.58, 276.29, 276.29] #(micrograms)
 calanus_L1 = [0.22, 0.27, 0.4, 0.48, 0.55, 0.61, 0.79, 1.08, 1.38, 1.8, 2.43, 2.11, 2.11] #(length in mm)
 calanus_L2 = [0.1, 0.1, 0.1, 0.15,  0.18, 0.2, 0.22, 0.25, 0.31, 0.41, 0.52, 0.65, 0.65] #(width in mm)
-
+calanus_Area=np.zeros(len(calanus_L2))
+"""Calculate the image area (mm^2) of elongated prey"""
+for i in range(len(calanus_L1)):
+    calanus_Area[i]=0.75*(calanus_L1[i])*(calanus_L2[i])
+    
 """Settings for progressbar"""
 empty  =u'\u25FD'
 filled =u'\u25FE'
