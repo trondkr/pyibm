@@ -18,16 +18,16 @@ Variables that are imported to ibm.py using from initLarva import *
 
 """Number of release dates and cohorts. This will be lowered if NReleaseDatesInit*daysBetweenReleases is
 more than total number of simulation days : see function init in ibm.py"""
-NReleaseDatesInit=5
-daysBetweenReleases=30
-Nlarva=1
-NDaysAlive=5
+NReleaseDatesInit=40
+daysBetweenReleases=21
+Nlarva=100
+NDaysAlive=21
 Nprey=1
-initWgt=0.090 #wgt in milligrams
-initDepth=0.1
-randomWgt=0 #1=on, 0=off Initialize weight with random values from initWgt
+initWgt=0.120 #wgt in milligrams
+initDepth=2
+randomWgt=1 #1=on, 0=off Initialize weight with random values from initWgt
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
-MultiplyPrey=50
+MultiplyPrey=30
 
 missingValue=-9.99e-35
 dt      = 3600                   
@@ -42,7 +42,7 @@ mm2m  = 0.001
 m2mm  = 1000.
 ltr2mm3 = 1e-6
 micro2m = 0.001
-contrast = 0.1 #Inherent contrast after Fiksen,02
+contrast = 0.3 #Inherent contrast after Fiksen,02
 mm2m = 0.001
 mg2ug=1000.0
 C2 = 0.05                     
@@ -56,10 +56,10 @@ attCoeff = 0.18
 beamAttCoeff=attCoeff*3.0
 Nhours =24
 FishDens = 0.0001	#Predation from fish depends on density of predators
-deadThreshold=0.7   #Individuals die if weight is less than 70% of regular weight at length: predation.py
+deadThreshold=0.8   #Individuals die if weight is less than 70% of regular weight at length: predation.py
 
 """Here you define how many time steps you want per 24 hours"""
-dt_per_day=240
+dt_per_day=24
 deltaH = 24./(dt_per_day*1.0)	#Hours per timestep
    
 """Here you define the vertical resolution of behavior and movement meter

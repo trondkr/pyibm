@@ -42,6 +42,7 @@ def getStationData(cdf, varlist, grdSTATION, log, clim, stationName):
         a station (eta_rho, xi_rho), from top to bottom. The variables extracted at this station are
         defined in the "varlist" variable.
         """
+        """Masked extreme values"""
         
         if log is True:
             print "\n---> Extracting time series of %s from station %s"%(var,stationName)
