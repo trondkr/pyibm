@@ -489,7 +489,7 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
     """Calculate stomach fullness"""
     stomachFullness =  (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size)
   
-    return ing,GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness
+    return ing,GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness, MultiplyPrey*(prey+1)*P
    
 def getMaxMinDepths(oldDepth,maxHourlyMove):
     """The value you give deepstDepthAllowed will be the absolute deepest
@@ -649,14 +649,21 @@ def updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim
     time stamps, then update the indices and give the new indices"""
    
     if julian >=julianFileB and julian < grdSTATION.JDend:
-        #print 'reset time julian',julianFileA/3600.,julian/3600.,julianFileB/3600.
         julianIndex=julianIndex+1
         julianFileA=grdSTATION.time[julianIndex]*86400
         julianFileB=grdSTATION.time[julianIndex+1]*86400
-       # print 'new  time julian',julianFileA/3600.,julian/3600.,julianFileB/3600.
-       # print "diff to go: ",julianFileB/3600.-julian/3600.
-       # print "\n"
         Finish = False
+    elif julian < julianFileB and julian < julianFileA:
+        """Now, if you run with more than one individual you have to reset the
+        fileIndices for where in the input files you interpolate from between each individual.
+        Therefore, here we search backwards to find the correct start and stop indices for the new
+        individual."""
+        while julian < julianFileB and julian < julianFileA:
+            julianIndex=julianIndex-1
+            julianFileA=grdSTATION.time[julianIndex]*86400
+            julianFileB=grdSTATION.time[julianIndex+1]*86400
+            Finish = False
+            
     elif julian > grdSTATION.JDend:
         Finish = True
     else:
@@ -715,6 +722,7 @@ def ibm(station,stationName,stationNumber,event):
     Psurvive =(np.ones((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
     SGR      =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
     larvaTdata   =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
+    larvaNauplii  =(np.zeros((Ncohorts,Nlarva,Ntime,Nprey),dtype=np.float64))*missingValue
    
     R=np.zeros(13,dtype=np.float64)
     enc=np.zeros(13,dtype=np.float64)
@@ -853,7 +861,8 @@ def ibm(station,stationName,stationNumber,event):
                                     """Light level at current depth:"""
                                     Eb = surfaceLight*np.exp(attCoeff*(-depth))
                                     """Calculate growth and ingestion at the current depth:"""
-                                    ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness = calculateGrowth(julian,Eb,deltaH,depth,h,grdSTATION,dt,W[cohort,ind,t-1,prey],
+                                    
+                                    ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness,Ndata = calculateGrowth(julian,Eb,deltaH,depth,h,grdSTATION,dt,W[cohort,ind,t-1,prey],
                                                                                                          L[cohort,ind,t-1,prey],julianIndex,
                                                                                                          julianFileA,julianFileB,R,enc,hand,ing,pca,
                                                                                                          S[cohort,ind,t-1,prey],prey)
@@ -878,7 +887,7 @@ def ibm(station,stationName,stationNumber,event):
                                         
                                 Eb = surfaceLight*np.exp(attCoeff*(-depth))
                                 """Now recalculate the growth and mortality at the optimal depth layer"""
-                                ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness = calculateGrowth(julian,Eb,deltaH,depth,h,grdSTATION,dt,W[cohort,ind,t-1,prey],
+                                ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness,Ndata = calculateGrowth(julian,Eb,deltaH,depth,h,grdSTATION,dt,W[cohort,ind,t-1,prey],
                                                                                                      L[cohort,ind,t-1,prey],julianIndex,
                                                                                                      julianFileA,julianFileB,R,enc,hand,ing,pca,
                                                                                                      S[cohort,ind,t-1,prey],prey)
@@ -897,6 +906,7 @@ def ibm(station,stationName,stationNumber,event):
                                 W_AF[cohort,ind,t,prey] = W_AF[cohort,ind,t-1,prey] + (np.exp(GR)-1)*W_AF[cohort,ind,t-1,prey]
                                 larvaTdata[cohort,ind,t,prey] = Tdata
                                 larvaDepth[cohort,ind,t,prey] = depth
+                                larvaNauplii[cohort,ind,t,prey] = Ndata
                                 
                                 if didStarve > 1: larvaPsur[cohort,ind,t,prey]=0.0
                                 else:larvaPsur[cohort,ind,t,prey]=larvaPsur[cohort,ind,t-1,prey]*(np.exp(-mortality))
@@ -934,7 +944,7 @@ def ibm(station,stationName,stationNumber,event):
                                     showProgress(Ntime,Ntime,message)
                                     
                                     startAndStopIndex[cohort,:,1]=t
-                                    IOwrite.writeStationFile(deltaH,deltaZ,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex)
+                                    IOwrite.writeStationFile(deltaH,deltaZ,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaNauplii,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex)
                                     move(outputFile, "results/"+outputFile)
                                     loopsDone = True
                                     
@@ -947,7 +957,7 @@ def ibm(station,stationName,stationNumber,event):
                             else:
                                 julian=oldJulian
                                 t=oldT
-                            
+                            julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim)
                             hour=0
                     ind=0
         if loopsDone is False:

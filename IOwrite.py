@@ -5,7 +5,7 @@ import numpy as np
 import time
 import os
 
-def writeStationFile(deltaH,deltaZ,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex):
+def writeStationFile(deltaH,deltaZ,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaNauplii,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex):
      
      f1 = Dataset(outputFile, mode='w', format='NETCDF4')
      f1.description="This is a IBM result file for a given station"
@@ -64,6 +64,10 @@ def writeStationFile(deltaH,deltaZ,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larva
      v.long_name = "Temperature"
      v.units = "degrees Celsius"
      
+     v=f1.createVariable('nauplii', 'f', ('cohort','larva','time','prey'),zlib=True)
+     v.long_name = "Nauplii"
+     v.units = "numbers per liter"
+     
      v=f1.createVariable('depth', 'f', ('cohort','larva','time','prey'),zlib=True)
      v.long_name = "Depth"
      v.units = "meter"
@@ -79,6 +83,7 @@ def writeStationFile(deltaH,deltaZ,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larva
      f1.variables['sgr'][:,:,:,:]  = SGR[:,:,:,:]
      f1.variables['sgrAF'][:,:,:,:]  = W_AF
      f1.variables['temp'][:,:,:,:]  = larvaTdata
+     f1.variables['nauplii'][:,:,:,:]  = larvaNauplii[:,:,:,:]
      f1.variables['depth'][:,:,:,:]  = larvaDepth
      f1.variables['timeIndex'][:,:,:]  = startAndStopIndex
       
