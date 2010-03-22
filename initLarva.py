@@ -19,8 +19,8 @@ Variables that are imported to ibm.py using from initLarva import *
 """Number of release dates and cohorts. This will be lowered if NReleaseDatesInit*daysBetweenReleases is
 more than total number of simulation days : see function init in ibm.py"""
 NReleaseDatesInit=100
-daysBetweenReleases=30
-Nlarva=1
+daysBetweenReleases=15
+Nlarva=5
 NDaysAlive=30
 Nprey=3
 initWgt=0.090 #wgt in milligrams
@@ -59,7 +59,7 @@ FishDens = 0.0001	#Predation from fish depends on density of predators
 deadThreshold=0.8   #Individuals die if weight is less than 70% of regular weight at length: predation.py
 
 """Here you define how many time steps you want per 24 hours"""
-dt_per_day=48
+dt_per_day=24
 deltaH = 24./(dt_per_day*1.0)	#Hours per timestep
    
 """Here you define the vertical resolution of behavior and movement meter

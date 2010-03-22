@@ -46,6 +46,7 @@ def infoOnResolution(grdSTATION):
                                                              datetime.timedelta(seconds=deltaH*3600.)
                                                              - grdSTATION.refDate)
     print 'Vertical : %s cm (rounds to %i decimalpoints)'%(deltaZ*100.,lastDecimal)
+    print 'The simulations are run with %i prey densities'%(Nprey)
     print '-----------------------------------------------------------------\n'
 
 def coldWarmEvent(stationName,event):
@@ -261,7 +262,7 @@ def getDepthIndex(grdSTATION,depth):
             #print 'depth 1:',grdSTATION.depth[d], depth, grdSTATION.depth[d+1],depthIndex1, depthIndex2
             
         elif abs(grdSTATION.depth[0]) > abs(depth) and depthFOUND==False:
-            depthIndex1=d; depthIndex2=d; dz1=0.5; dz2=0.5
+            depthIndex1=0; depthIndex2=0; dz1=0.5; dz2=0.5
             depthFOUND=True
             #print 'depth 2:',grdSTATION.depth[d], depth,depthIndex1, depthIndex2
              
@@ -453,13 +454,16 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
          
   
     """FOOD == Calculate seasonal prey density based on temperature and phytoplankton"""
-    Food=(Tdata - grdSTATION.aveT.min()) / (grdSTATION.aveT.max() - grdSTATION.aveT.min())
-  
+    currentDate = grdSTATION.refDate + datetime.timedelta(seconds=julian)
+    Tanomaly = (Tdata - grdSTATION.aveT[int(currentDate.month-1)]) / (grdSTATION.aveT.max() - grdSTATION.aveT.min())
+    
     if grdSTATION.relativeSeawifsValue > 0.01:
-        P = Food + grdSTATION.relativeSeawifsValue
+        P = Tanomaly + grdSTATION.relativeSeawifsValue
     else:
         P = grdSTATION.relativeSeawifsValue
-   
+    
+    P = max(0.0,P)
+    
     """VISUAL == PERCEPTION of PREY calculations==============================="""          
     Em = (Larval_mm**2.0)/(contrast*0.1*0.2*0.75) #Size-specific sensitivity of the visual system (Fiksen,02)
     
@@ -481,11 +485,13 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
     """Calculate handling time, encounter rate, and probability of capture"""
     hand[j] = 0.264*10**(7.0151*(calanus_L1[j]/Larval_mm)) # Walton 1992
     enc[j] = ((0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * (calanus_D[j]*((prey+1)*MultiplyPrey*P))* ltr2mm3)
+    
+    
     pca[j] = enc[j]*max(0.0,min(1.0,-16.7*(calanus_L1[j]/Larval_mm) + 3.0/2.0))
     
     """Calculate ingestion rate"""
     ing[j] = (dt*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]))*deltaH
-    
+   
     """Calculate stomach fullness"""
     stomachFullness =  (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size)
   
@@ -695,7 +701,6 @@ def ibm(station,stationName,stationNumber,event):
     julianFileA and julianFileB are the time stamps of inbetween
     the larvae recides relative to time from file. Temperature is
     interpolated to date julian from julianFileA and julianFileB"""
-    #TODO: Need to also add the hours but hours is not in timedelta? No worries for soda data though
     julian=time.days*86400 + time.seconds
     
     julianFileA=grdSTATION.time[0]*86400
@@ -743,12 +748,11 @@ def ibm(station,stationName,stationNumber,event):
     loopsDone = False
     grdSTATION.dayOfYear = -9
     print "RANDOM WEIGHT INITIALIZED"
-    W[:,:,:,:]         = initWgt 
-    W[:,:,:,:]         = W + ((W/2.)*np.random.random_sample(W.shape))*randomWgt# milligram (5mm larvae)
+    W[:,:,:,:]         = initWgt + ((initWgt/2.)*np.random.random_sample(W.shape))*randomWgt# milligram (5mm larvae) 
     W_AF[:,:,:,:]      = initWgt
     S[:,:,:,:]         = stomach_threshold*gut_size*W # 30% av max mageinnhold
     L[:,:,:,:]         = calculateLength(initWgt, 0.0)
-            
+    print W    
     larvaTime=[]
     released=[]
     for i in range(Ncohorts): released.append(0)
@@ -866,7 +870,7 @@ def ibm(station,stationName,stationNumber,event):
                                                                                                          L[cohort,ind,t-1,prey],julianIndex,
                                                                                                          julianFileA,julianFileB,R,enc,hand,ing,pca,
                                                                                                          S[cohort,ind,t-1,prey],prey)
-                                    
+                         
                                     """Calculate mortality at the current depth layer"""
                                     mortality, didStarve, dead = predation.FishPredAndStarvation(grdSTATION,deltaH,FishDens,L[cohort,ind,t-1,prey]*mm2m,W[cohort,ind,t-1,prey],
                                                                                 attCoeff,Eb,dt,ing,stomachFullness)
@@ -942,7 +946,8 @@ def ibm(station,stationName,stationNumber,event):
                                 if ind==(Nlarva-1) and cohort==(releasedCohorts-1) and prey==(Nprey-1):
                                     message='---> Finished IBMtime on date: %s. Writing results to file....'%(grdSTATION.refDate + datetime.timedelta(seconds=julian))
                                     showProgress(Ntime,Ntime,message)
-                                    
+                                    larvaTime.append(julian/3600.)
+
                                     startAndStopIndex[cohort,:,1]=t
                                     IOwrite.writeStationFile(deltaH,deltaZ,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larvaNauplii,larvaDepth,W_AF,larvaPsur,outputFile,startAndStopIndex)
                                     move(outputFile, "results/"+outputFile)
@@ -977,19 +982,15 @@ if __name__=="__main__":
     stations=["/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_NorthSea.nc",
               "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_Iceland.nc",
               "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_Lofoten.nc",
-              "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_Lofoten.nc",
               "/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_GeorgesBank.nc"]
     """Notice that if you use seawifs data, the order of the stations here have to match
-    the order of station seawifs data in seawifs file"""
-    stationNames=['North Sea', 'Iceland', 'East Greenland', 'Lofoten', 'Georges Bank']
+    the order of station seawifs data in seawifs file (see extractSeaWifs.py file)"""
+    stationNames=['North Sea', 'Iceland','Lofoten', 'Georges Bank']
     
     stationNumber=0
     
     events = ['COLD', 'WARM']
     #event = 'REGULAR RUN'
-    
-    #stations=["/Users/trond/Projects/arcwarm/SODA/soda2roms/stations/station_Iceland.nc"]
-    #stationNames=["Iceland"]
     
     if events[0] !='COLD':
         for station, stationName in zip(stations,stationNames):
