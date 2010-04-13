@@ -20,7 +20,7 @@ Variables that are imported to ibm.py using from initLarva import *
 more than total number of simulation days : see function init in ibm.py"""
 NReleaseDatesInit=100
 daysBetweenReleases=15
-Nlarva=5
+Nlarva=100
 NDaysAlive=30
 Nprey=3
 initWgt=0.090 #wgt in milligrams
@@ -56,7 +56,8 @@ attCoeff = 0.18
 beamAttCoeff=attCoeff*3.0
 Nhours =24
 FishDens = 0.0001	#Predation from fish depends on density of predators
-deadThreshold=0.8   #Individuals die if weight is less than 70% of regular weight at length: predation.py
+deadThreshold=0.7   #Individuals die if weight is less than 70% of regular weight at length: predation.py
+costRateOfMetabolism=0.2 # The rate of how much full swimming for one time step will cost relative to routine metabolism
 
 """Here you define how many time steps you want per 24 hours"""
 dt_per_day=24

@@ -4,6 +4,7 @@ import string, os, sys
 import datetime, types
 from netCDF4 import Dataset
 import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 
 __author__   = 'Trond Kristiansen'
 __email__    = 'trond.kristiansen@imr.no'
@@ -42,7 +43,7 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
     clf()    
     
     styles=['o','s','']
-    preyList=[1]
+    preyList=[1,2]
         
     Nprey=len(preyList)
     
@@ -58,6 +59,7 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
         for t in range(len(time)):
             if time[t]<1000000:
                 time2.append(refDate + datetime.timedelta(hours=time[t]))
+                
         print "Start time %s and end time %s"%(time2[0],time2[-1])
         maxInd=len(time2)
         
@@ -89,7 +91,7 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
                     if stNumber==0 and prey==0:
                         timeSGR1[cohort]=time[index1]
                     if stNumber==1 and prey==0:
-                        timeSGR2[cohort]=timeSGR1[cohort]-widthIndex/4.
+                        timeSGR2[cohort]=timeSGR1[cohort]+widthIndex/4.
                
                 t=refDate + datetime.timedelta(hours=time[index1])
                 tt=str(t.month)+"/"+str(t.day)
@@ -98,32 +100,47 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
                 meanSGR[cohort,prey]=np.mean(larvaSGR[cohort,:,prey])
                 stdSGR[cohort,prey]=np.std(larvaSGR[cohort,:,prey])
             
+            pos=meanSGR[:,prey] + stdSGR[:,prey]
+            neg=meanSGR[:,prey] - stdSGR[:,prey]
+                
             if stNumber==0 and prey==0:
-                plot(timeSGR1, np.squeeze(meanSGR[:,prey]), color=co[stNumber],linewidth = 3,alpha=1)
+                fill_between(timeSGR1,neg,pos, facecolor='grey',alpha=0.3) 
+                plot(timeSGR1, np.squeeze(meanSGR[:,prey]), color=co[stNumber],linewidth = 4,alpha=1)
                 plot(timeSGR1, np.squeeze(meanSGR[:,prey]), color=co[stNumber],marker=styles[prey],alpha=1)
-                #bar(timeSGR1, np.squeeze(meanSGR[:,prey])*100., width=widthIndex/4.5, color=co[stNumber], alpha=1.0, yerr=stdSGR[:,prey])
+                #bar(timeSGR1, np.squeeze(meanSGR[:,prey]), width=widthIndex/4.5, color=co[stNumber], alpha=1.0, yerr=stdSGR[:,prey])
                 coldSurvival=meanSGR[cohort,prey]*100.
             if stNumber==1 and prey==0:
-                plot(timeSGR1, np.squeeze(meanSGR[:,prey]), color=co[stNumber], linewidth = 3,alpha=1)
-                plot(timeSGR1, np.squeeze(meanSGR[:,prey]), color=co[stNumber], marker=styles[prey],alpha=1)
-                #bar(timeSGR2, np.squeeze(meanSGR[:,prey])*100., width=widthIndex/4.5, color=co[stNumber], alpha=1.0, yerr=stdSGR[:,prey])
+                fill_between(timeSGR2,neg,pos, facecolor='grey',alpha=0.3)
+                plot(timeSGR2, np.squeeze(meanSGR[:,prey]), color=co[stNumber], linewidth = 4,alpha=1)
+                plot(timeSGR2, np.squeeze(meanSGR[:,prey]), color=co[stNumber], marker=styles[prey],alpha=1)
+                
+                #bar(timeSGR2, np.squeeze(meanSGR[:,prey]), width=widthIndex/4.5, color=co[stNumber], alpha=1.0, yerr=stdSGR[:,prey])
                 warmSurvival=meanSGR[cohort,prey]*100.
                 
             """Plot the higher prey density values as shaded colors in the background"""
-           # if stNumber==0 and prey==1:
-           #     bar(timeSGR1, np.squeeze(meanSGR[:,prey])*100., width=widthIndex/4.5, color=co[stNumber], alpha=0.2)
-           #     coldSurvival=meanSGR[cohort,prey]*100.
-           # if stNumber==1 and prey==1:
-           #     bar(timeSGR2, np.squeeze(meanSGR[:,prey])*100., width=widthIndex/4.5, color=co[stNumber], alpha=0.2)
-           #     warmSurvival=meanSGR[cohort,prey]*100.
+            if stNumber==0 and prey==1:
+                fill_between(timeSGR1,neg,pos, facecolor='grey',alpha=0.3)
+                plot(timeSGR1, np.squeeze(meanSGR[:,prey]), color=co[stNumber], linewidth = 2,alpha=0.3)
+                plot(timeSGR1, np.squeeze(meanSGR[:,prey]), color=co[stNumber],marker=styles[prey],alpha=0.3)
+                   
+                #bar(timeSGR1, np.squeeze(meanSGR[:,prey]), width=widthIndex/4.5, color=co[stNumber], alpha=0.2, yerr=stdSGR[:,prey])
+                coldSurvival=meanSGR[cohort,prey]*100.
+            if stNumber==1 and prey==1:
+                fill_between(timeSGR2,neg,pos, facecolor='grey',alpha=0.3) 
+                plot(timeSGR2, np.squeeze(meanSGR[:,prey]), color=co[stNumber], linewidth = 2,alpha=0.3)
+                plot(timeSGR2, np.squeeze(meanSGR[:,prey]), color=co[stNumber],marker=styles[prey],alpha=0.3)
+                #bar(timeSGR2, np.squeeze(meanSGR[:,prey]), width=widthIndex/4.5, color=co[stNumber], alpha=0.2, yerr=stdSGR[:,prey])
+                warmSurvival=meanSGR[cohort,prey]*100.
         stNumber+=1
     
     
             
     ax=gca()
+    axis('tight')
     ax.set_ylim(-4, 20)
-    ax.annotate(str(stationNames[stName]), xy=(timeSGR1[0],17),  xycoords='data',size=16, bbox=dict(boxstyle="round", fc='grey', alpha=0.5))
-    
+    ax.axhline(y=0.0, linewidth=2, color='grey')        
+    ax.annotate(str(stationNames[stName]), xy=(timeSGR1[1],17),  xycoords='data',size=16, bbox=dict(boxstyle="round", fc='grey', alpha=0.5))
+  
     xticks(timeSGR2, datez, rotation=-90)
     ylabel("Specific growth rate (%/day)")
     plotfile="results/compare_"+str(stationNames[stName])+"_sgr.png"

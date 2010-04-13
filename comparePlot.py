@@ -14,7 +14,7 @@ __version__  = "0.1"
 __status__   = "Development"
 
 missingValue=-9.99e-35
-   
+  
 stationsCold=["results/IBM_1977_station_Lofoten.nc",
               "results/IBM_1965_station_GeorgesBank.nc",
               "results/IBM_1963_station_NorthSea.nc",
@@ -42,7 +42,7 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
     stNumber=0
     
     fig=plt.figure()
-    prey=2
+    prey=0
         
     for station in st:
         cdf=Dataset(station,"r")
@@ -59,7 +59,8 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
         for t in range(len(time)):
             if time[t]<1000000:
                 time2.append(refDate + datetime.timedelta(hours=time[t]))
-        print "Start time %s and end time %s"%(time2[0],time2[-1])
+#                print "hour",datetime.timedelta(hours=time[t])
+            
         maxInd=len(time2)
         
         sgr      =cdf.variables["sgr"][:,:,:,:]

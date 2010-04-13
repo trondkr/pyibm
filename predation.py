@@ -29,18 +29,19 @@ def FishPredAndStarvation(grdSTATION,dh,FishDens,Larval_m,Larval_wgt,attCoeff,Eb
     LarvalWidth   = LarvalShape*Larval_m
     PreyImageArea = LarvalWidth*Larval_m*0.75	
    
-    IER=0; visualRange=0.0 
-    """All input to getr is either in m (or per m), or in mm (or per mm)"""
+    IER=0; visualRange=0.0
+   
+    """All input to getr is either in m (or per m), or in mm (or per mm). Here we use meter (m):"""
     visualRange, IER = perception.perception.getr(visualRange,beamAttCoeff/m2mm,PreyContrast,PreyImageArea,EyeSens,Ke_predator,Eb, IER)
     
     """Calculate lethal encounter rate with fish setMort is either 0 (off) or 1 (on)"""
     FishMortality = setMort*(VisFieldShape*np.pi*(visualRange**2)*FishSwimVel*FishDens)
+    
     InvertebrateMortality = setMort*OtherPred(Larval_m,aPred,bPred)
     Starved, dead = aliveOrDead(Larval_wgt, Larval_m,ing,stomachFullness)
-
     Mortality = (InvertebrateMortality + FishMortality + Starved*StarvationMortality)*seconds*dh
     
-    #print 'inv', InvertebrateMortality, 'fish',FishMortality, 'starv',Starved*StarvationMortality
+    #print 'inv', InvertebrateMortality*seconds*dh, 'fish',FishMortality*seconds*dh, 'starv',Starved*StarvationMortality*seconds*dh
     return Mortality, Starved, dead
 
 def OtherPred(L_m,aPred,bPred):     
@@ -70,7 +71,7 @@ def aliveOrDead(Larval_wgt, Larval_m,ing,stomachFullness):
         
     if (refWeight*deadThreshold > Larval_wgt*1000.):
         """Give a very high probability of death when belowe 80% (deadThreshold)"""
-        starvation = 100000
+        starvation = 10000
         dead = 0
         #print 'Larva died of starvation'
 

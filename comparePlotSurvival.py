@@ -111,7 +111,13 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
                     time24H[cohort,i]=time[k1]
            
             ax.plot(time24H[cohort,:],-meanDEPTH24H,color=co[stNumber],linewidth = 3, alpha=0.5)
-            ax.fill_between(time24H[cohort,:], -meanDEPTH24H+stdDEPTH24H, -meanDEPTH24H-stdDEPTH24H, facecolor=co[stNumber],alpha=0.3)
+            devNEG=np.zeros(meanDEPTH24H.shape)
+            devPOS=np.zeros(meanDEPTH24H.shape)
+            
+            for d in range(len(meanDEPTH24H)):
+                devNEG[d] =min(0.0,-meanDEPTH24H[d]-stdDEPTH24H[d])
+                devPOS[d] =min(0.0,-meanDEPTH24H[d]+stdDEPTH24H[d])
+            ax.fill_between(time24H[cohort,:], devPOS, devNEG, facecolor=co[stNumber],alpha=0.3)
             ylabel("Depth (m)")
             gca().set_xticklabels([])
             title(str(stationNames[stName]))

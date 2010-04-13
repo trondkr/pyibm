@@ -747,12 +747,13 @@ def ibm(station,stationName,stationNumber,event):
     t=1
     loopsDone = False
     grdSTATION.dayOfYear = -9
-    print "RANDOM WEIGHT INITIALIZED"
-    W[:,:,:,:]         = initWgt + ((initWgt/2.)*np.random.random_sample(W.shape))*randomWgt# milligram (5mm larvae) 
+    if randomWgt==1: print "RANDOM WEIGHT INITIALIZED"
+    
+    W[:,:,:,:]         = initWgt + ((initWgt*0.2)* (np.random.random_sample(W.shape))*np.random.random_integers(-1,1,W.shape)*randomWgt) # milligram (5mm larvae) 
     W_AF[:,:,:,:]      = initWgt
     S[:,:,:,:]         = stomach_threshold*gut_size*W # 30% av max mageinnhold
     L[:,:,:,:]         = calculateLength(initWgt, 0.0)
-    print W    
+    
     larvaTime=[]
     released=[]
     for i in range(Ncohorts): released.append(0)
@@ -850,8 +851,7 @@ def ibm(station,stationName,stationNumber,event):
                                 radfl0,maxLight,cawdir = calclight.calclight.qsw(radfl0,maxLight,cawdir,clouds,grdSTATION.lat*np.pi/180.0,dayOfYear,daysInYear)
                                 maxLight = maxLight/0.217 # Convert from W/m2 to umol/m2/s-1
                                 sunHeight, surfaceLight = calclight.calclight.surlig(hourOfDay,maxLight,dayOfYear,grdSTATION.lat,sunHeight,surfaceLight)
-                                """If you don't have fortran compiler:"""     
-                                #surfaceLight = IOlight.surfaceLight(grdSTATION,julian,grdSTATION.lat,hour)
+                                
                                 """Find the attenuation coefficient as a function of Chlorophyll-a values"""
                                 if grdSTATION.seawifs is True:
                                     attCoeff=calculateAttenuationCoeff(grdSTATION.seawifsValue)
@@ -862,6 +862,7 @@ def ibm(station,stationName,stationNumber,event):
                                 for findDepth in range(NOptDepths+1):
                                     """Current depth:"""
                                     depth=h_start+findDepth*deltaZ
+                                    diffZ=findDepth*deltaZ
                                     """Light level at current depth:"""
                                     Eb = surfaceLight*np.exp(attCoeff*(-depth))
                                     """Calculate growth and ingestion at the current depth:"""
@@ -875,8 +876,13 @@ def ibm(station,stationName,stationNumber,event):
                                     mortality, didStarve, dead = predation.FishPredAndStarvation(grdSTATION,deltaH,FishDens,L[cohort,ind,t-1,prey]*mm2m,W[cohort,ind,t-1,prey],
                                                                                 attCoeff,Eb,dt,ing,stomachFullness)
                                   
+                                    """Calculate the cost of being active. The more you swim the more you use energy in raltive ratio to
+                                    routine metabolims. Trond Kristiansen, 23.03.2010"""
+                                    activityCost= (diffZ/(NOptDepths+1))*(meta*costRateOfMetabolism)
+                                    #print depth, diffZ, activityCost
+                                    
                                     """Calculate fitness at the current depth layer"""
-                                    F = sum(ing)/W[cohort,ind,t-1,prey]
+                                    F = (sum(ing)-activityCost)/W[cohort,ind,t-1,prey]
 
                                     
                                     optDepth,oldFitness = getBehavior(stomachFullness,
