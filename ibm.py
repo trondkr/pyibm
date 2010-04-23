@@ -288,7 +288,7 @@ def initBehavior(depth,maxHourlyMove):
 def getBehavior(stomachFullness,F,m,length,oldFitness,depth,optDepth):
     """Rule 4 of Behavioral Ecology paper - Kristiansen et al. 2009"""
     T=min(1.0,0.3+1000.0*(1+(length)*np.exp(length))**(-1))
-
+    
     #print "behavior ", T, length, 0.3+1000.0*(1+(length)*np.exp(length))**(-1), length
     if stomachFullness > T:
         beta   = 7.0
@@ -467,31 +467,31 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
     """VISUAL == PERCEPTION of PREY calculations==============================="""          
     Em = (Larval_mm**2.0)/(contrast*0.1*0.2*0.75) #Size-specific sensitivity of the visual system (Fiksen,02)
     
-    #for j in range(6):
-    j=1
-    IER=0; R[j]=0.0 #R[j]=np.sqrt(Em*contrast*(calanus_Area[j])*(Eb/(Ke_larvae+Eb)))
-    """All input to getr is either in m (or per m), or in mm (or per mm)"""
-    R[j], IER = perception.perception.getr(R[j],beamAttCoeff/m2mm,contrast,calanus_Area[j],Em,Ke_larvae,Eb, IER)
-   
-    """If you don't have fortran compiler use python routine for visual range"""
-    #visual = np.sqrt(Em*contrast*(Ap_calanus*m2mm)*(Eb/(Ke_larvae+Eb)))
-    #R[j] = (IOlight.getPerceptionDistance(Em,attCoeff,Ke_larvae,Ap_calanus,Eb))*m2mm
-    
-    """Calculate turbulence based on wind stress"""
-    epsilon=(5.82*1.E-9*((np.sqrt(windX**2 + windY**2)))**3.)/(depth+0.1)
-    omega = 1.9*(epsilon*R[j]*mm2m)**0.667
-    omega =  omega * m2mm # From m/s to mm/s
-    
-    """Calculate handling time, encounter rate, and probability of capture"""
-    hand[j] = 0.264*10**(7.0151*(calanus_L1[j]/Larval_mm)) # Walton 1992
-    enc[j] = ((0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * (calanus_D[j]*((prey+1)*MultiplyPrey*P))* ltr2mm3)
-    
-    
-    pca[j] = enc[j]*max(0.0,min(1.0,-16.7*(calanus_L1[j]/Larval_mm) + 3.0/2.0))
-    
-    """Calculate ingestion rate"""
-    ing[j] = (dt*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]))*deltaH
-   
+    for j in range(6):
+    #j=1
+        IER=0; R[j]=0.0 #R[j]=np.sqrt(Em*contrast*(calanus_Area[j])*(Eb/(Ke_larvae+Eb)))
+        """All input to getr is either in m (or per m), or in mm (or per mm)"""
+        R[j], IER = perception.perception.getr(R[j],beamAttCoeff/m2mm,contrast,calanus_Area[j],Em,Ke_larvae,Eb, IER)
+       
+        """If you don't have fortran compiler use python routine for visual range"""
+        #visual = np.sqrt(Em*contrast*(Ap_calanus*m2mm)*(Eb/(Ke_larvae+Eb)))
+        #R[j] = (IOlight.getPerceptionDistance(Em,attCoeff,Ke_larvae,Ap_calanus,Eb))*m2mm
+        
+        """Calculate turbulence based on wind stress"""
+        epsilon=(5.82*1.E-9*((np.sqrt(windX**2 + windY**2)))**3.)/(depth+0.1)
+        omega = 1.9*(epsilon*R[j]*mm2m)**0.667
+        omega =  omega * m2mm # From m/s to mm/s
+        
+        """Calculate handling time, encounter rate, and probability of capture"""
+        hand[j] = 0.264*10**(7.0151*(calanus_L1[j]/Larval_mm)) # Walton 1992
+        enc[j] = ((0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * (calanus_D[j]*((prey+1)*MultiplyPrey*P))* ltr2mm3)
+        
+        
+        pca[j] = enc[j]*max(0.0,min(1.0,-16.7*(calanus_L1[j]/Larval_mm) + 3.0/2.0))
+        
+        """Calculate ingestion rate"""
+        ing[j] = (dt*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]))*deltaH
+        #print j, ing[j], hour
     """Calculate stomach fullness"""
     stomachFullness =  (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size)
   
@@ -749,7 +749,7 @@ def ibm(station,stationName,stationNumber,event):
     grdSTATION.dayOfYear = -9
     if randomWgt==1: print "RANDOM WEIGHT INITIALIZED"
     
-    W[:,:,:,:]         = initWgt + ((initWgt*0.2)* (np.random.random_sample(W.shape))*np.random.random_integers(-1,1,W.shape)*randomWgt) # milligram (5mm larvae) 
+    W[:,:,:,:]         = initWgt + ((initWgt*0.1)* (np.random.random_sample(W.shape))*np.random.random_integers(-1,1,W.shape)*randomWgt) # milligram (5mm larvae) 
     W_AF[:,:,:,:]      = initWgt
     S[:,:,:,:]         = stomach_threshold*gut_size*W # 30% av max mageinnhold
     L[:,:,:,:]         = calculateLength(initWgt, 0.0)
@@ -848,8 +848,12 @@ def ibm(station,stationName,stationNumber,event):
                                 dayOfYear = float(tt[7]); month=float(tt[1]); hourOfDay = float(tt[3]); daysInYear=365.0
                                 radfl0=0.0; maxLight=0.0; cawdir=0.0; clouds=0.0; sunHeight=0.0; surfaceLight=0.0
                                 
+                                """Calculate the maximum and average light values for a given geographic position
+                                for a given time of year. Notcie we use radfl0 instead of maximum values maxLight
+                                in light caclualtions. Seemed better to use average values than extreme values.
+                                NOTE: Convert from W/m2 to umol/m2/s-1"""
                                 radfl0,maxLight,cawdir = calclight.calclight.qsw(radfl0,maxLight,cawdir,clouds,grdSTATION.lat*np.pi/180.0,dayOfYear,daysInYear)
-                                maxLight = maxLight/0.217 # Convert from W/m2 to umol/m2/s-1
+                                maxLight = maxLight/0.217 #radfl0/0.217
                                 sunHeight, surfaceLight = calclight.calclight.surlig(hourOfDay,maxLight,dayOfYear,grdSTATION.lat,sunHeight,surfaceLight)
                                 
                                 """Find the attenuation coefficient as a function of Chlorophyll-a values"""
@@ -878,7 +882,7 @@ def ibm(station,stationName,stationNumber,event):
                                   
                                     """Calculate the cost of being active. The more you swim the more you use energy in raltive ratio to
                                     routine metabolims. Trond Kristiansen, 23.03.2010"""
-                                    activityCost= (diffZ/(NOptDepths+1))*(meta*costRateOfMetabolism)
+                                    activityCost= (diffZ/float(NOptDepths+1))*(meta*costRateOfMetabolism)
                                     #print depth, diffZ, activityCost
                                     
                                     """Calculate fitness at the current depth layer"""
@@ -889,7 +893,9 @@ def ibm(station,stationName,stationNumber,event):
                                                                  F,mortality,L[cohort,ind,t-1,prey],
                                                                  oldFitness,depth,optDepth)
                                    
-                                """Set the optimal depth equal to result of optimal loop and update light at depth"""    
+                                """Set the optimal depth equal to result of optimal loop and update light at depth"""
+                                diffZ=abs(depth-optDepth)
+                               # print "Difference in old versus new depth %s (old=%s, new=%s): cost=%s w=%s"%(diffZ,depth,optDepth,float(activityCost),float(W[cohort,ind,t-1,prey]))
                                 depth=optDepth
                                 if grdSTATION.seawifs is True:
                                     attCoeff=calculateAttenuationCoeff(grdSTATION.seawifsValue)
@@ -905,12 +911,16 @@ def ibm(station,stationName,stationNumber,event):
                                 mortality, didStarve, dead = predation.FishPredAndStarvation(grdSTATION,deltaH,FishDens,L[cohort,ind,t-1,prey]*mm2m,
                                                                                        W[cohort,ind,t-1,prey],attCoeff,
                                                                                        Eb,dt,ing,stomachFullness)
+                                
+                                """Calculate the cost of the activity performed during last hour for vertical behavior"""
+                                activityCost= (diffZ/float(NOptDepths+1))*(meta*costRateOfMetabolism)
                                
                                 S[cohort,ind,t,prey] = max(0.0, min(gut_size*W[cohort,ind,t-1,prey],S[cohort,ind,t-1,prey] + sum(ing[:])))
                                 ingrate[cohort,ind,t,prey] = max(0.0, (S[cohort,ind,t,prey] - S[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey])
                               
-                                W[cohort,ind,t,prey] = W[cohort,ind,t-1,prey] + min(GR_gram + meta,S[cohort,ind,t,prey]*assi) - meta 
-                                S[cohort,ind,t,prey] = max(0.0, S[cohort,ind,t,prey] - ((W[cohort,ind,t,prey] - W[cohort,ind,t-1,prey]) + meta)/assi) # + 0.1*act*abs(Init(l,6) - Init(l,6))/(L(l)*dt)*meta)/assi;
+                                W[cohort,ind,t,prey] = W[cohort,ind,t-1,prey] + min(GR_gram + meta,S[cohort,ind,t,prey]*assi) - meta
+                              
+                                S[cohort,ind,t,prey] = max(0.0, S[cohort,ind,t,prey] - ((W[cohort,ind,t,prey] - W[cohort,ind,t-1,prey]) + meta)/assi - activityCost) 
                                 L[cohort,ind,t,prey] = calculateLength(W[cohort,ind,t,prey], L[cohort,ind,t-1,prey])
                                
                                 W_AF[cohort,ind,t,prey] = W_AF[cohort,ind,t-1,prey] + (np.exp(GR)-1)*W_AF[cohort,ind,t-1,prey]

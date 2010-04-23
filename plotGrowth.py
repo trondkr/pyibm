@@ -43,7 +43,7 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
     clf()    
     
     styles=['o','s','']
-    preyList=[1,2]
+    preyList=[0,1]
         
     Nprey=len(preyList)
     
@@ -110,9 +110,9 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
                 #bar(timeSGR1, np.squeeze(meanSGR[:,prey]), width=widthIndex/4.5, color=co[stNumber], alpha=1.0, yerr=stdSGR[:,prey])
                 coldSurvival=meanSGR[cohort,prey]*100.
             if stNumber==1 and prey==0:
-                fill_between(timeSGR2,neg,pos, facecolor='grey',alpha=0.3)
-                plot(timeSGR2, np.squeeze(meanSGR[:,prey]), color=co[stNumber], linewidth = 4,alpha=1)
-                plot(timeSGR2, np.squeeze(meanSGR[:,prey]), color=co[stNumber], marker=styles[prey],alpha=1)
+                fill_between(timeSGR1,neg,pos, facecolor='grey',alpha=0.3)
+                plot(timeSGR1, np.squeeze(meanSGR[:,prey]), color=co[stNumber], linewidth = 4,alpha=1)
+                plot(timeSGR1, np.squeeze(meanSGR[:,prey]), color=co[stNumber], marker=styles[prey],alpha=1)
                 
                 #bar(timeSGR2, np.squeeze(meanSGR[:,prey]), width=widthIndex/4.5, color=co[stNumber], alpha=1.0, yerr=stdSGR[:,prey])
                 warmSurvival=meanSGR[cohort,prey]*100.
@@ -126,9 +126,9 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
                 #bar(timeSGR1, np.squeeze(meanSGR[:,prey]), width=widthIndex/4.5, color=co[stNumber], alpha=0.2, yerr=stdSGR[:,prey])
                 coldSurvival=meanSGR[cohort,prey]*100.
             if stNumber==1 and prey==1:
-                fill_between(timeSGR2,neg,pos, facecolor='grey',alpha=0.3) 
-                plot(timeSGR2, np.squeeze(meanSGR[:,prey]), color=co[stNumber], linewidth = 2,alpha=0.3)
-                plot(timeSGR2, np.squeeze(meanSGR[:,prey]), color=co[stNumber],marker=styles[prey],alpha=0.3)
+                fill_between(timeSGR1,neg,pos, facecolor='grey',alpha=0.3) 
+                plot(timeSGR1, np.squeeze(meanSGR[:,prey]), color=co[stNumber], linewidth = 2,alpha=0.3)
+                plot(timeSGR1, np.squeeze(meanSGR[:,prey]), color=co[stNumber],marker=styles[prey],alpha=0.3)
                 #bar(timeSGR2, np.squeeze(meanSGR[:,prey]), width=widthIndex/4.5, color=co[stNumber], alpha=0.2, yerr=stdSGR[:,prey])
                 warmSurvival=meanSGR[cohort,prey]*100.
         stNumber+=1
