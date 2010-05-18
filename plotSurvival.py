@@ -15,38 +15,49 @@ __status__   = "Development, modified 9.9.2009, 18.02.2010, 2.3.2010"
 missingValue=-9.99e-35
 
 stationsCold=["results/IBM_1977_station_Lofoten.nc",
-              "results/IBM_1965_station_GeorgesBank.nc",
               "results/IBM_1963_station_NorthSea.nc",
-              "results/IBM_1983_station_Iceland.nc"]
+              "results/IBM_1983_station_Iceland.nc",
+              "results/IBM_1965_station_GeorgesBank.nc"]
 
 stationsWarm=["results/IBM_1990_station_Lofoten.nc",
-              "results/IBM_1999_station_GeorgesBank.nc",
               "results/IBM_1999_station_NorthSea.nc",
-              "results/IBM_1960_station_Iceland.nc"]
+              "results/IBM_1960_station_Iceland.nc",
+              "results/IBM_1999_station_GeorgesBank.nc"]
 
-stationNames=["Lofoten","Georges Bank","North Sea","Iceland"]
+stationNames=["Lofoten","North Sea","Iceland","Georges Bank"]
 
+spawningStart=[3,1,4,2]
+spawningEnd  =[5,5,5,5]
 co=["slategrey","darkgrey"]
 co=["blue","red"]
 
 years=['Cold','Warm']
 stName=0
-fig=plt.figure()
+
+"""Choose which variable to plot"""
+variable="fitness"
+variable="survival"
+
 for stationCold, stationWarm in zip(stationsCold,stationsWarm):
-    print "\n\nComparing station for two different years :"
+    print "\n\nComparing %s at station for two different years :"%(variable)
     print "1->%s"%(stationCold)
     print "2->%s\n"%(stationWarm)
     st=[]
     st.append(stationCold)
     st.append(stationWarm)
     stNumber=0
-    clf()    
     
     styles=['o','s','']
-    preyList=[0,1]
+    preyList=[0]
         
     Nprey=len(preyList)
-   
+    fig=plt.figure()
+    left, width = 0.1, 0.8
+    rect1 = [left, 0.7, width, 0.25]
+    rect2 = [left, 0.1, width, 0.60]
+    ax1 = fig.add_axes(rect1)
+    ax2 = fig.add_axes(rect2, sharex=ax1)
+#    clf()
     for station in st:
         cdf=Dataset(station,"r")
          
@@ -77,16 +88,17 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
             timePsur2=np.ones((Ncohorts),dtype=float64)
             larvaPsur=np.ones((Ncohorts,Nindividuals,Nprey),dtype=float64)
             meanPsur=np.ones((Ncohorts,Nprey),dtype=float64)
+            pdfCold=np.ones((Ncohorts,Nprey),dtype=float64)
+            pdfWarm=np.ones((Ncohorts,Nprey),dtype=float64)
             stdPsur=np.ones((Ncohorts,Nprey),dtype=float64)
             fitness=np.ones((Ncohorts,Nprey),dtype=float64)
+            spawning=np.ones((2),dtype=float64)
             datez=[]
-      
+            
         for prey in range(len(preyList)):
-           # print "Calculating average values for prey level %s"%(preyList[prey])
-              
             for cohort in range(Ncohorts):
                  
-                index1=int(timeIndex[cohort,0,0])+1
+                index1=int(timeIndex[cohort,0,0])
                 index2=int(timeIndex[cohort,0,1])-1
                 days=int((index2-index1)/(24.0/float(deltaH)))
                 widthIndex=((index2-index1))/4.1
@@ -97,14 +109,20 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
                     if stNumber==0 and prey==0:
                         timePsur1[cohort]=time[index2]
                         if ind==0:
-                            print "Time : %s to %s (%s days)"%(time2[index1],time2[index2], days)
-                        
+                            #print "Time : %s to %s (%s days)"%(time2[index1],time2[index2], days)
+                            t=refDate +datetime.timedelta(hours=time[index2])
+                            
+                            if spawningStart[stName]==int(t.month):
+                                spawning[0]=cohort 
+                            if spawningEnd[stName]==int(t.month):
+                                spawning[1]=cohort + 1
+                                
                     if stNumber==0 and prey==0:
                         timePsur2[cohort]=timePsur1[cohort] +widthIndex
                         
-               
+                
                 t=refDate + datetime.timedelta(hours=time[index2])
-                tt=str(t.month)+"/"+str(t.day)
+                tt=str(t.day)+"/"+str(t.month)
                 datez.append(tt)
              
                 meanPsur[cohort,prey]=np.mean(larvaPsur[cohort,:,prey])
@@ -112,51 +130,90 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
                 stdPsur[cohort,prey]=np.std(larvaPsur[cohort,:,prey])
                 fitness[cohort,prey]=meanPsur[cohort,prey]*(mean(wgt[cohort,:,index2,prey]))
             """Here you choose what to plot (var):"""
-            var=np.squeeze(meanPsur[:,prey])*100.
-            var=np.squeeze(fitness[:,prey])*100.
-                
-           # print "Total survival %s for cohort is %s at time %s for prey level %s\n"%(meanPsur[cohort,prey]*100.,cohort,t,prey)
+            if variable=="survival":
+                var=np.squeeze(meanPsur[:,prey])*100.
+            if variable=="fitness":
+                var=np.squeeze(fitness[:,prey])*100.
+            
+            """Calculate the cumulative Probability Density Function and plot it"""
             if stNumber==0 and prey==0:
-                #plot(timePsur1, np.squeeze(meanPsur[:,prey])*100., color=co[stNumber],linewidth = 3,alpha=1)
-                #plot(timePsur1, np.squeeze(meanPsur[:,prey])*100., color=co[stNumber],marker=styles[prey],alpha=1)
-                bar(timePsur1, var, width=widthIndex, color=co[stNumber], alpha=0.8, yerr=stdPsur[:,prey]*100.)
-                coldSurvival=meanPsur[cohort,prey]*100.
+                for p in range(len(meanPsur[:,0])):
+                    if variable=="fitness":
+                        pdfCold[p,prey] = (np.sum(fitness[0:p,prey]))
+                        totalCold=np.sum(np.sum(fitness[:,prey]))
+                    if variable=="survival":
+                        pdfCold[p,prey] = (np.sum(meanPsur[0:p,prey]))
+                        totalCold=np.sum(np.sum(meanPsur[:,prey]))
             if stNumber==1 and prey==0:
-                #plot(timePsur1, np.squeeze(meanPsur[:,prey])*100., color=co[stNumber], linewidth = 3,alpha=1)
-                #plot(timePsur1, np.squeeze(meanPsur[:,prey])*100., color=co[stNumber], marker=styles[prey],alpha=1)
-                bar(timePsur2, var, width=widthIndex, color=co[stNumber], alpha=0.8, yerr=stdPsur[:,prey]*100.)
-                warmSurvival=meanPsur[cohort,prey]*100.
-          
+                for p in range(len(meanPsur[:,0])):
+                    if variable=="fitness":
+                        pdfWarm[p,prey] = (np.sum(fitness[0:p,prey]))
+                        totalWarm=np.sum(np.sum(fitness[:,prey]))
+                    if variable=="survival":
+                        pdfWarm[p,prey] = (np.sum(meanPsur[0:p,prey]))
+                        totalWarm=np.sum(np.sum(meanPsur[:,prey]))
+                        
+            if stNumber==0 and prey==0:
+                ax2.bar(timePsur1, var, width=widthIndex, color=co[stNumber], alpha=0.8, yerr=stdPsur[:,prey]*100.)
+    
+            if stNumber==1 and prey==0:
+                ax2.bar(timePsur2, var, width=widthIndex, color=co[stNumber], alpha=0.8, yerr=stdPsur[:,prey]*100.)
+   
             """Plot the higher prey density values as shaded colors in the background"""
             if stNumber==0 and prey==1:
-                bar(timePsur1, var, width=widthIndex, color=co[stNumber], alpha=0.3, yerr=stdPsur[:,prey]*100.)
-                coldSurvival=meanPsur[cohort,prey]*100.
+                ax2.bar(timePsur1, var, width=widthIndex, color=co[stNumber], alpha=0.3, yerr=stdPsur[:,prey]*100.)
             if stNumber==1 and prey==1:
-                bar(timePsur2, var, width=widthIndex, color=co[stNumber], alpha=0.3, yerr=stdPsur[:,prey]*100.)
-                warmSurvival=meanPsur[cohort,prey]*100.
+                ax2.bar(timePsur2, var, width=widthIndex, color=co[stNumber], alpha=0.3, yerr=stdPsur[:,prey]*100.)
                 
-            print "Average survival for year %s at station %s for prey %s is %s"%(station[12:16],stationNames[stName],prey,np.mean(meanPsur[:,prey])*100.)
+                
+            ax2.set_ylim(0, 0.3)
+            ax2.set_xlim(timePsur1[0],timePsur1[-1])
+            ax1.set_xticklabels([])
+            print "spawning start %s and end %s"%(datez[int(spawning[0])], datez[int(spawning[1])])
+            if stName!=1:
+                cumulative=(np.sum(np.squeeze(meanPsur[spawning[0]:spawning[1],prey]))*100.)
+                print "================================================================================================="
+                print "Cumulative %s during spawning for year %s at station %s for prey %s is %s"%(variable,
+                                                                                                   station[12:16],
+                                                                                                   stationNames[stName],
+                                                                                                   prey,cumulative)
+                print "================================================================================================="
+            else:
+                #GB special case
+                cumulative=(np.sum(np.squeeze(meanPsur[spawning[0]:spawning[1],prey]))*100.) + (np.sum(np.squeeze(meanPsur[21:-1,prey]))*100.)
+                print "================================================================================================="
+                print "Cumulative %s during spawning for year %s at station %s for prey %s is %s"%(variable,
+                                                                                                   station[12:16],
+                                                                                                   stationNames[stName],
+                                                                                                   prey, cumulative)
+                print "================================================================================================="
         stNumber+=1
+        
+    ax1.plot(timePsur1, pdfWarm/(totalWarm+totalCold), color="red",linewidth = 3,alpha=1)
+    ax1.plot(timePsur1, pdfCold/(totalWarm+totalCold), color="blue", linewidth = 3,alpha=1)
+  
+    ax1.set_ylim(0, 1)
+    ax1.set_xlim(timePsur1[0],timePsur1[-1]) 
+    ax1.set_xticklabels([""],color="grey", alpha=0.0)
     
     
-            
-    ax=gca()
-    axis('tight')  
-    ax.set_ylim(0, 0.3)
-    ax.annotate(str(stationNames[stName]), xy=(timePsur1[1],0.27),  xycoords='data',size=16, bbox=dict(boxstyle="round", fc='grey', alpha=0.5))
+    ax1.annotate(str(stationNames[stName]), xy=(timePsur1[1],0.8),  xycoords='data',size=16, bbox=dict(boxstyle="round", fc='grey', alpha=0.5))
+    xticks(timePsur1,datez, rotation=-90)
     
-    xticks(timePsur1, datez, rotation=-90)
-    ylabel("Survival probability (%)")
-    ylabel("Fitness")
-   # plotfile="results/compare_"+str(stationNames[stName])+"_fitness.png"
-   # plt.savefig(plotfile)
+    if variable=="survival":
+        plotfile="results/compare_"+str(stationNames[stName])+"_survival.pdf"
+        ax1.set_ylabel("PDF")
+        ax2.set_ylabel("Survival prob. (%)")
+          
+    if variable=="fitness":
+        ax2.set_ylabel("Fitness")
+        ax1.set_ylabel("PDF")
+        plotfile="results/compare_"+str(stationNames[stName])+"_fitness.pdf"
     
-    plotfile="results/compare_"+str(stationNames[stName])+"_survival.pdf"
     plt.savefig(plotfile)
     
     print "Saving to file: %s"%(plotfile)
     stName+=1
        
-   # for t in range(len(timePsur2)):
-   #     print "Survival in month %s : %3.3f warm: %3.3f cold: %3.3f"%(t,(warmSurvival[t]/(coldSurvival[t] + 0.00000001))*100., warmSurvival[t], coldSurvival[t])
-   # show()
+    show()
+  
