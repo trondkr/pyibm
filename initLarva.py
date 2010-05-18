@@ -18,16 +18,16 @@ Variables that are imported to ibm.py using from initLarva import *
 
 """Number of release dates and cohorts. This will be lowered if NReleaseDatesInit*daysBetweenReleases is
 more than total number of simulation days : see function init in ibm.py"""
-NReleaseDatesInit=100
+NReleaseDatesInit=150
 daysBetweenReleases=15
-Nlarva=1
+Nlarva=100
 NDaysAlive=30
-Nprey=2
+Nprey=1
 initWgt=0.09 #wgt in milligrams
 initDepth=15
 randomWgt=1 #1=on, 0=off Initialize weight with random values from initWgt
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
-MultiplyPrey=5
+MultiplyPrey=14
 
 missingValue=-9.99e-35
 dt      = 3600                   
@@ -54,10 +54,10 @@ Ke_larvae = 1
 Ke_predator = 1              
 attCoeff = 0.18
 beamAttCoeff=attCoeff*3.0
-Nhours =24
-FishDens = 0.0001	#Predation from fish depends on density of predators
-deadThreshold=0.7   #Individuals die if weight is less than 70% of regular weight at length: predation.py
-costRateOfMetabolism=0.5 # The rate of how much full swimming for one time step will cost relative to routine metabolism
+Nhours =48
+FishDens = 0.00015	#Predation from fish depends on density of predators
+deadThreshold=0.8   #Individuals die if weight is less than 70% of regular weight at length: predation.py (Fiksen et al. 2002)
+costRateOfMetabolism=0.2 # The rate of how much full swimming for one time step will cost relative to routine metabolism
 
 """Here you define how many time steps you want per 24 hours"""
 dt_per_day=24
@@ -70,7 +70,7 @@ deltaZ=1
 lastDecimal=0
 
 """ Initialize Calanus """
-calanus_D  = [0.5, 1.0, 0.2, 0.1, 0.05, 0.01, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
+calanus_D  = [0.3, 0.4, 0.2, 0.1, 0.05, 0.01, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
 calanus_W  = [0.33, 0.49, 1., 1.51,2.09, 2.76, 4.18, 13.24, 23.13, 63.64, 169.58, 276.29, 276.29] #(micrograms)
 calanus_L1 = [0.22, 0.27, 0.4, 0.48, 0.55, 0.61, 0.79, 1.08, 1.38, 1.8, 2.43, 2.11, 2.11] #(length in mm)
 calanus_L2 = [0.1, 0.1, 0.1, 0.15,  0.18, 0.2, 0.22, 0.25, 0.31, 0.41, 0.52, 0.65, 0.65] #(width in mm)

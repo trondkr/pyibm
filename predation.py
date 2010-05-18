@@ -40,7 +40,7 @@ def FishPredAndStarvation(grdSTATION,dh,FishDens,Larval_m,Larval_wgt,attCoeff,Eb
     InvertebrateMortality = setMort*OtherPred(Larval_m,aPred,bPred)
     Starved, dead = aliveOrDead(Larval_wgt, Larval_m,ing,stomachFullness)
     Mortality = (InvertebrateMortality + FishMortality + Starved*StarvationMortality)*seconds*dh
-    
+   
     #print 'inv', InvertebrateMortality*seconds*dh, 'fish',FishMortality*seconds*dh, 'starv',Starved*StarvationMortality*seconds*dh
     return Mortality, Starved, dead
 
@@ -63,7 +63,7 @@ def aliveOrDead(Larval_wgt, Larval_m,ing,stomachFullness):
     
     refWeight = WeightAtLength(Larval_m)
     dead=1
-    if (refWeight > Larval_wgt*1000. or (sum(ing) < 0.00000001 and stomachFullness < 0.0000001)):
+    if (refWeight > Larval_wgt*1000. or ((sum(ing) < 0.00000001 and stomachFullness < 0.0000001))):
         starvation=1
         #print 'starvation %s refWgt: %s wgt: %s'%(starvation,refWeight, Larval_wgt*1000.)
     else:

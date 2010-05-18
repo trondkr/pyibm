@@ -280,14 +280,46 @@ def initBehavior(depth,maxHourlyMove):
     oldDepth=depth  #The previous depth for a given larvae for a time step inside optimal loop
     optDepth=depth  # The optimal depth for a given larvae for a time step 
     h_start, h_stop = getMaxMinDepths(oldDepth,maxHourlyMove)
-    NOptDepths=int((abs(oldDepth-h_start) + abs(h_stop-oldDepth))/float(deltaZ))
+    NOptDepths=int((abs(oldDepth-h_start) + abs(h_stop-oldDepth) )/float(deltaZ))
+    
+    sampleDepths=[]
+    maxDiff=0.0
+    if oldDepth  == 0.0:
+        for i in range(NOptDepths+1):
+            newDepth = oldDepth + float(deltaZ)*(float(i))
+            if newDepth <0: newDepth=0.0
+            if newDepth < h_start: newDepth=h_start
+            if newDepth > h_stop: newDepth=h_stop
+            if newDepth not in sampleDepths:
+                sampleDepths.append(newDepth)
+                if abs(newDepth-oldDepth) > maxDiff: maxDiff=abs(newDepth-oldDepth)
+    else:
+        # Move down into the water column limited by h_stop
+        for i in range(NOptDepths/2):
+            newDepth = oldDepth + float(deltaZ)*(NOptDepths/2 - float(i))
+            if newDepth <0: newDepth=0.0
+           
+            if newDepth > h_stop: newDepth=h_stop
+            if newDepth not in sampleDepths:
+                sampleDepths.append(newDepth)
+                if abs(newDepth-oldDepth) > maxDiff: maxDiff=abs(newDepth-oldDepth)
+        for i in range(NOptDepths/2+1):
+            newDepth = oldDepth - float(deltaZ)*((float(i)))
+            if newDepth <0: newDepth=0.0
+            if newDepth < h_start: newDepth=h_start
+            if newDepth not in sampleDepths:
+                sampleDepths.append(newDepth)
+                if abs(newDepth-oldDepth) > maxDiff: maxDiff=abs(newDepth-oldDepth)
+    
+    #for j in range(len(sampleDepths)):
+    #  print "depth %3.3f diffZ %3.3f"%(sampleDepths[j], abs(oldDepth-sampleDepths[j]))
     fitness=-9999.9
-  
-    return oldDepth,optDepth,h_start,h_stop,NOptDepths,fitness
+    
+    return oldDepth,optDepth,sampleDepths,maxDiff,fitness
 
 def getBehavior(stomachFullness,F,m,length,oldFitness,depth,optDepth):
     """Rule 4 of Behavioral Ecology paper - Kristiansen et al. 2009"""
-    T=min(1.0,0.3+1000.0*(1+(length)*np.exp(length))**(-1))
+    T=min(0.9,0.3+1000.0*(1+(length)*np.exp(length))**(-1))
     
     #print "behavior ", T, length, 0.3+1000.0*(1+(length)*np.exp(length))**(-1), length
     if stomachFullness > T:
@@ -467,7 +499,7 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
     """VISUAL == PERCEPTION of PREY calculations==============================="""          
     Em = (Larval_mm**2.0)/(contrast*0.1*0.2*0.75) #Size-specific sensitivity of the visual system (Fiksen,02)
     
-    for j in range(6):
+    for j in range(7):
     #j=1
         IER=0; R[j]=0.0 #R[j]=np.sqrt(Em*contrast*(calanus_Area[j])*(Eb/(Ke_larvae+Eb)))
         """All input to getr is either in m (or per m), or in mm (or per mm)"""
@@ -487,11 +519,12 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
         enc[j] = ((0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * (calanus_D[j]*((prey+1)*MultiplyPrey*P))* ltr2mm3)
         
         
-        pca[j] = enc[j]*max(0.0,min(1.0,-16.7*(calanus_L1[j]/Larval_mm) + 3.0/2.0))
-        
+        pca[j] = max(0.0,min(1.0,-16.7*(calanus_L1[j]/Larval_mm) + 3.0/2.0))
+        #print "j: ",j, " enc:",enc[j]*dt*deltaH, " mm:",Larval_mm, "pca:",pca[j]
         """Calculate ingestion rate"""
-        ing[j] = (dt*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]))*deltaH
-        #print j, ing[j], hour
+        ing[j] = (dt*enc[j]*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]))*deltaH
+        #print gut_size*Larval_wgt, Spre + sum(ing), (Larval_wgt*gut_size), "\n"
+        #print "j:",j, "ing:",ing[j], "hour:",hour, "stomachfull:", (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size), "\n"
     """Calculate stomach fullness"""
     stomachFullness =  (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size)
   
@@ -500,7 +533,7 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
 def getMaxMinDepths(oldDepth,maxHourlyMove):
     """The value you give deepstDepthAllowed will be the absolute deepest
     depth the larvae will move to. Useful to set this depth equal to bottom."""
-    deepstDepthAllowed=55.
+    deepstDepthAllowed=50.
     if (oldDepth>maxHourlyMove and oldDepth+maxHourlyMove < deepstDepthAllowed):
         h_start = oldDepth - maxHourlyMove
         h_end   = oldDepth + maxHourlyMove
@@ -831,14 +864,14 @@ def ibm(station,stationName,stationNumber,event):
                          
                             """We calculate swimspeed once every 24 hours and assume it does not change during that time-period"""
                             swimSpeed=0.261*(L[cohort,ind,t-1,prey]**(1.552*L[cohort,ind,t-1,prey]**(0.920-1.0)))-(5.289/L[cohort,ind,t-1,prey])
-                            maxHourlyMove=((swimSpeed*(dt/1000.))/4.0)*deltaH # Divided by four compared to original IBM in fortran
+                            maxHourlyMove=((swimSpeed*(dt/1000.))/2.0)*deltaH # Divided by four compared to original IBM in fortran
                             maxHourlyMove = round(maxHourlyMove,lastDecimal)
                                 
                             for hour in range(dt_per_day):
                                 """Since we split hour into parts, the new hour variable is h"""   
                                 h = deltaH*1.0*hour
-                
-                                oldDepth,optDepth,h_start,h_stop,NOptDepths,oldFitness = initBehavior(depth,maxHourlyMove)
+                               
+                                oldDepth,optDepth,sampleDepths,maxDiffZ,oldFitness = initBehavior(depth,maxHourlyMove)
                                 gtime=grdSTATION.refDate + datetime.timedelta(seconds=julian)
                                 
                                 """LIGHT == Get the maximum light at the current latitude, and the current surface light at the current time.
@@ -863,10 +896,11 @@ def ibm(station,stationName,stationNumber,event):
                                     #print "attenuation coeff: %s depth: %s chl: %s"%(attCoeff,depth,grdSTATION.relativeSeawifsValue)
                                         
                                 """OPTIMAL DEPTH == Find the optimal depth to stay at given ratio of ingestion and mortality rate"""
-                                for findDepth in range(NOptDepths+1):
-                                    """Current depth:"""
-                                    depth=h_start+findDepth*deltaZ
-                                    diffZ=findDepth*deltaZ
+                               #print "Current depth ",oldDepth
+                                for depth in sampleDepths:
+                                    
+                                    diffZ=abs(oldDepth - depth)
+                                  #  print "depth %s and diff Z %s maxDiff %s"%(depth, diffZ, maxDiffZ)
                                     """Light level at current depth:"""
                                     Eb = surfaceLight*np.exp(attCoeff*(-depth))
                                     """Calculate growth and ingestion at the current depth:"""
@@ -882,8 +916,8 @@ def ibm(station,stationName,stationNumber,event):
                                   
                                     """Calculate the cost of being active. The more you swim the more you use energy in raltive ratio to
                                     routine metabolims. Trond Kristiansen, 23.03.2010"""
-                                    activityCost= (diffZ/float(NOptDepths+1))*(meta*costRateOfMetabolism)
-                                    #print depth, diffZ, activityCost
+                                    activityCost= (diffZ/maxDiffZ)*(meta*costRateOfMetabolism)
+                                   
                                     
                                     """Calculate fitness at the current depth layer"""
                                     F = (sum(ing)-activityCost)/W[cohort,ind,t-1,prey]
@@ -897,10 +931,7 @@ def ibm(station,stationName,stationNumber,event):
                                 diffZ=abs(depth-optDepth)
                                # print "Difference in old versus new depth %s (old=%s, new=%s): cost=%s w=%s"%(diffZ,depth,optDepth,float(activityCost),float(W[cohort,ind,t-1,prey]))
                                 depth=optDepth
-                                if grdSTATION.seawifs is True:
-                                    attCoeff=calculateAttenuationCoeff(grdSTATION.seawifsValue)
-                                    beamAttCoeff=attCoeff*3.0
-                                        
+                                
                                 Eb = surfaceLight*np.exp(attCoeff*(-depth))
                                 """Now recalculate the growth and mortality at the optimal depth layer"""
                                 ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness,Ndata = calculateGrowth(julian,Eb,deltaH,depth,h,grdSTATION,dt,W[cohort,ind,t-1,prey],
@@ -913,14 +944,14 @@ def ibm(station,stationName,stationNumber,event):
                                                                                        Eb,dt,ing,stomachFullness)
                                 
                                 """Calculate the cost of the activity performed during last hour for vertical behavior"""
-                                activityCost= (diffZ/float(NOptDepths+1))*(meta*costRateOfMetabolism)
+                                activityCost= (diffZ/maxDiffZ)*(meta*costRateOfMetabolism)
                                
                                 S[cohort,ind,t,prey] = max(0.0, min(gut_size*W[cohort,ind,t-1,prey],S[cohort,ind,t-1,prey] + sum(ing[:])))
                                 ingrate[cohort,ind,t,prey] = max(0.0, (S[cohort,ind,t,prey] - S[cohort,ind,t-1,prey])/W[cohort,ind,t-1,prey])
                               
-                                W[cohort,ind,t,prey] = W[cohort,ind,t-1,prey] + min(GR_gram + meta,S[cohort,ind,t,prey]*assi) - meta
+                                W[cohort,ind,t,prey] = W[cohort,ind,t-1,prey] + min(GR_gram + meta,S[cohort,ind,t,prey]*assi) - meta - activityCost
                               
-                                S[cohort,ind,t,prey] = max(0.0, S[cohort,ind,t,prey] - ((W[cohort,ind,t,prey] - W[cohort,ind,t-1,prey]) + meta)/assi - activityCost) 
+                                S[cohort,ind,t,prey] = max(0.0, S[cohort,ind,t,prey] - ((W[cohort,ind,t,prey] - W[cohort,ind,t-1,prey]) + meta)/assi) 
                                 L[cohort,ind,t,prey] = calculateLength(W[cohort,ind,t,prey], L[cohort,ind,t-1,prey])
                                
                                 W_AF[cohort,ind,t,prey] = W_AF[cohort,ind,t-1,prey] + (np.exp(GR)-1)*W_AF[cohort,ind,t-1,prey]
