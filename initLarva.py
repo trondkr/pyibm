@@ -20,14 +20,14 @@ Variables that are imported to ibm.py using from initLarva import *
 more than total number of simulation days : see function init in ibm.py"""
 NReleaseDatesInit=150
 daysBetweenReleases=15
-Nlarva=100
+Nlarva=1
 NDaysAlive=30
 Nprey=1
 initWgt=0.09 #wgt in milligrams
 initDepth=15
 randomWgt=1 #1=on, 0=off Initialize weight with random values from initWgt
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
-MultiplyPrey=14
+MultiplyPrey=20
 
 missingValue=-9.99e-35
 dt      = 3600                   

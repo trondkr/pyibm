@@ -27,15 +27,16 @@ def getStationData(cdf, varlist, grdSTATION, log, clim, stationName):
     if clim is False:
         grdSTATION.time=cdf.variables['time'][grdSTATION.startIndex:grdSTATION.endIndex]
     else:
-        grdSTATION.time=(cdf.variables['clim_time'][grdSTATION.startIndex:grdSTATION.endIndex])*5
-        
-    for var in varlist:
-        if var in ["taux","tauy","ssh"]:
-            var_array_rawXY[:,var_numberXY] = cdf.variables[var][grdSTATION.startIndex:grdSTATION.endIndex]
-            var_numberXY=var_numberXY+1
-        else:
-            var_array_rawXYZ[:,:,var_numberXYZ] = cdf.variables[var][grdSTATION.startIndex:grdSTATION.endIndex,:]
-            var_numberXYZ=var_numberXYZ+1
+        grdSTATION.time=(cdf.variables['time'][grdSTATION.startIndex:grdSTATION.endIndex])
+    
+    if clim is False:    
+        for var in varlist:
+            if var in ["taux","tauy","ssh"]:
+                var_array_rawXY[:,var_numberXY] = cdf.variables[var][grdSTATION.startIndex:grdSTATION.endIndex]
+                var_numberXY=var_numberXY+1
+            else:
+                var_array_rawXYZ[:,:,var_numberXYZ] = cdf.variables[var][grdSTATION.startIndex:grdSTATION.endIndex,:]
+                var_numberXYZ=var_numberXYZ+1
    
         """
         Slice the data in the netcdf file that you want to keep. In our case we store a time-series from
