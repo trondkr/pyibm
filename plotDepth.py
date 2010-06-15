@@ -145,7 +145,7 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
 
     stations+=1
 
-plotfile="results/compare_"+str(stationNames[stName])+"_survival.png"
+plotfile="results/All_stations_depth.png"
 plt.savefig(plotfile)
 print "Saving to file: %s"%(plotfile)
 stName+=1

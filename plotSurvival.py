@@ -64,6 +64,8 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
         depth =cdf.variables["depth"][:,:,:,:]
         time  =cdf.variables["time"][:]
         timeIndex=cdf.variables["timeIndex"][:,:,:]
+        length =cdf.variables["length"][:,:,1,0]
+        print "Average length of individuals at all cohorts %3.4f+-%4.4f"%(np.mean(length),np.std(length))
         
         refDate=datetime.datetime(1948,1,1,0,0,0)
         time2=[]
@@ -170,13 +172,15 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
             ax2.set_xlim(timePsur1[0],timePsur1[-1])
             ax1.set_xticklabels([])
             print "spawning start %s and end %s"%(datez[int(spawning[0])], datez[int(spawning[1])])
-            if stName!=1:
+            if stName!=3:
                 cumulative=(np.sum(np.squeeze(meanPsur[spawning[0]:spawning[1],prey]))*100.)
                 print "================================================================================================="
                 print "Cumulative %s during spawning for year %s at station %s for prey %s is %s"%(variable,
                                                                                                    station[12:16],
                                                                                                    stationNames[stName],
                                                                                                    prey,cumulative)
+                print "Average survival rate was %3.4f +- %3.8f"%(np.mean(np.squeeze(meanPsur[spawning[0]:spawning[1],prey]))*100.,
+                                                                  np.std(np.squeeze(meanPsur[spawning[0]:spawning[1],prey]))*100.)
                 print "================================================================================================="
             else:
                 #GB special case
@@ -186,6 +190,11 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
                                                                                                    station[12:16],
                                                                                                    stationNames[stName],
                                                                                                    prey, cumulative)
+                print "Average survival rate was %3.4f +- %3.8f"%(np.mean(np.squeeze(meanPsur[spawning[0]:spawning[1],prey]))*100.+
+                                                                  + (np.mean(np.squeeze(meanPsur[21:-1,prey]))*100.),
+                                                                  np.std(np.squeeze(meanPsur[spawning[0]:spawning[1],prey]))*100.+
+                                                                  + (np.std(np.squeeze(meanPsur[21:-1,prey]))*100.),)
+                 
                 print "================================================================================================="
         stNumber+=1
         
@@ -196,6 +205,9 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
     ax1.set_xlim(timePsur1[0],timePsur1[-1]) 
     ax1.set_xticklabels([""],color="grey", alpha=0.0)
     
+    """Calculate the difference between a cold and a warm year in probability of survival"""
+    print "Probability of survival in warm versus cold year is %s\n"%((np.mean(pdfWarm[spawning[0]:spawning[1],0])
+                                                                    /np.mean(pdfCold[spawning[0]:spawning[1],0]))*100.)
     
     ax1.annotate(str(stationNames[stName]), xy=(timePsur1[1],0.8),  xycoords='data',size=16, bbox=dict(boxstyle="round", fc='grey', alpha=0.5))
     xticks(timePsur1,datez, rotation=-90)
@@ -215,5 +227,5 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
     print "Saving to file: %s"%(plotfile)
     stName+=1
        
-    show()
+    #show()
   
