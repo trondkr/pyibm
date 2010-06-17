@@ -19,7 +19,7 @@ Variables that are imported to ibm.py using from initLarva import *
 """Number of release dates and cohorts. This will be lowered if NReleaseDatesInit*daysBetweenReleases is
 more than total number of simulation days : see function init in ibm.py"""
 NReleaseDatesInit=150
-daysBetweenReleases=15
+daysBetweenReleases=10
 Nlarva=1
 NDaysAlive=30
 Nprey=1
@@ -27,7 +27,7 @@ initWgt=0.09 #wgt in milligrams
 initDepth=15
 randomWgt=1 #1=on, 0=off Initialize weight with random values from initWgt
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
-MultiplyPrey=20
+MultiplyPrey=10
 
 missingValue=-9.99e-35
 dt      = 3600                   
@@ -54,10 +54,9 @@ Ke_larvae = 1
 Ke_predator = 1              
 attCoeff = 0.18
 beamAttCoeff=attCoeff*3.0
-Nhours =48
 FishDens = 0.00015	#Predation from fish depends on density of predators
 deadThreshold=0.8   #Individuals die if weight is less than 70% of regular weight at length: predation.py (Fiksen et al. 2002)
-costRateOfMetabolism=0.2 # The rate of how much full swimming for one time step will cost relative to routine metabolism
+costRateOfMetabolism=0.25 # The rate of how much full swimming for one time step will cost relative to routine metabolism
 
 """Here you define how many time steps you want per 24 hours"""
 dt_per_day=24

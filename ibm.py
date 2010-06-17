@@ -96,17 +96,15 @@ def init(station,stationName,event):
     init: initializes the reading of files and definition of global variables
     """
     log         = True
-    clim        = False
     Finish      = False
     useAverageFile = False
     fileNameIn  = station
 
     """Option for using seawifs data as prey abundance"""
     seawifs=True
-    print "SeaWIFS usage is %s"%(seawifs)
     seawifsFileName="/Users/trond/Projects/seawifs/chlo-stations.nc"
     if seawifs==True:
-        seawifsArray=getSeaWifs(seawifsFileName)
+        seawifsArray=IOnetcdf.getSeaWifs(seawifsFileName)
     else:
         seawifsArray=None
    
@@ -119,7 +117,7 @@ def init(station,stationName,event):
     
     if useAverageFile==True:
         inFile="/Users/trond/Projects/arcwarm/SODA/soda2average/clim/averageSODA1961-1990.nc"
-        aveTemp = getAverageValues(inFile,grdSTATION.lon,grdSTATION.lat)
+        aveTemp = IOnetcdf.getAverageValues(inFile,grdSTATION.lon,grdSTATION.lat)
         grdSTATION.aveT=aveTemp
         
     if event == "COLD":
@@ -132,9 +130,8 @@ def init(station,stationName,event):
     
     if event == "CLIM RUN":
         varlist=['temp','salt','u','v'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
-        startDate = datetime.datetime(1948,1,16,0,0,0)
-        endDate   = datetime.datetime(1948,11,15,0,0,0)
-        clim=True
+        startDate = datetime.datetime(1948,1,15,1,0,0)
+        endDate   = datetime.datetime(1948,12,14,0,0,0)
         
     if event == 'COLD' or event=='WARM':
         startDate, endDate = coldWarmEvent(stationName,event)
@@ -142,7 +139,7 @@ def init(station,stationName,event):
     """Get the time information and find the indices for start and stop data to extract relative to
     the time period wanted. Takes input data:
     startDate="DD/MM/YYYY" and endDate="DD/MM/YYYY" or if none given, finds all date"""
-    getTimeIndices(cdf,grdSTATION,startDate,endDate,clim)
+    getTimeIndices(cdf,grdSTATION,startDate,endDate)
     
     """Get the total number of hours so that we can use this number to create arrays."""
     delta=(endDate - startDate)
@@ -157,7 +154,7 @@ def init(station,stationName,event):
         sys.exit()
     
     """Extract the variables at the given station and store in the grdSTATION object"""
-    IOnetcdf.getStationData(cdf,varlist,grdSTATION,log,clim,stationName)
+    IOnetcdf.getStationData(cdf,varlist,grdSTATION,log,stationName)
     """Store the maximum and minimum temperature values for the time period of interest, and
     use these to find the prey density as a function of temperature: function calculateGrowth"""
     
@@ -196,7 +193,7 @@ def init(station,stationName,event):
     
     infoOnResolution(grdSTATION)
       
-    return grdSTATION, clim, outputFile, NReleaseDates, Finish, seawifsArray
+    return grdSTATION, outputFile, NReleaseDates, Finish, seawifsArray
 
 def findActiveCohorts(isDead,isReleased):
     co=0; co2=0
@@ -252,16 +249,6 @@ def isAlive(julian,larvaAge,cohort,ind,t,prey,startAndStopIndex,isDead,grdSTATIO
    
     return isAliveBool, grdSTATION
     
-def getSeaWifs(seawifsFileName):
-    """Note that the oder of the station data read from seawifs file needs to
-    correspond to the order of stations calulcated and defined in main funtion!!!"""
-    file = Dataset(seawifsFileName)
-    print "SEAWIFS data -------------------------------------------"
-    print "Extracting seawifs data from file %s"%(seawifsFileName)
-    print "%s"%(file.stations)
-    seawifsArray = file.variables['Chlorophyll-a']
-   
-    return seawifsArray
     
 def getDepthIndex(grdSTATION,depth):
     depthFOUND=False; d=0
@@ -289,10 +276,10 @@ def getDepthIndex(grdSTATION,depth):
         d+=1
     return depthIndex1, depthIndex2, dz1, dz2
 
-def initBehavior(depth,maxHourlyMove):
+def initBehavior(depth,maxHourlyMove,grdSTATION):
     oldDepth=depth  #The previous depth for a given larvae for a time step inside optimal loop
     optDepth=depth  # The optimal depth for a given larvae for a time step 
-    h_start, h_stop = getMaxMinDepths(oldDepth,maxHourlyMove)
+    h_start, h_stop = getMaxMinDepths(oldDepth,maxHourlyMove,grdSTATION)
     NOptDepths=int((abs(oldDepth-h_start) + abs(h_stop-oldDepth) )/float(deltaZ))
     
     sampleDepths=[]
@@ -332,7 +319,7 @@ def initBehavior(depth,maxHourlyMove):
 
 def getBehavior(stomachFullness,F,m,length,oldFitness,depth,optDepth):
     """Rule 4 of Behavioral Ecology paper - Kristiansen et al. 2009"""
-    T=min(0.9,0.3+1000.0*(1+(length)*np.exp(length))**(-1))
+    T=min(0.8,0.3+1000.0*(1+(length)*np.exp(length))**(-1))
     
     #print "behavior ", T, length, 0.3+1000.0*(1+(length)*np.exp(length))**(-1), length
     if stomachFullness > T:
@@ -350,65 +337,6 @@ def getBehavior(stomachFullness,F,m,length,oldFitness,depth,optDepth):
     
     return optDepth,oldFitness
 
-def convertStressToWind(TauX,TauY):
-    """Convert surface stress to wind velocity for use in turbulence calculations of
-    encounter rate between larvae and prey. We assume a drag coefficient
-    with the shape Cd=0.44+0.063U (where U is wind at 10 m).
-    In SODA TauX and TauY are in N/m**2. This is equivavlent to
-    N=kgm/s**2 and therefore kg/ms**2. The unit for air density is kg/m**3 so
-    after doing the quadratic estimate of U we get wind velocity with units m/s.
-    
-    Update: changed drag coefficient top constant = 1.2e-3 and wind density to 1.3. This sfunction also
-    disregards direction of wind as we are only concerned with the scalar value."""
-    windX=abs(np.sqrt(abs(TauX)/(1.3*1.2e-3)))
-    windY=abs(np.sqrt(abs(TauY)/(1.3*1.2e-3)))
-   
-    return windX, windY
-    
-def getData(julian,julianIndex,julianFileA,julianFileB,dz1,dz2,depthIndex1,depthIndex2,grdSTATION):
-    """Calculate weights to use on input data from file"""
-    dwB = abs(julian) - abs(julianFileA)
-    dwA = abs(julianFileB) - abs(julian)
-    #print dwA/(dwA+dwB),dwB/(dwA+dwB),julian, julianFileA,julianFileB
-   
-    """Interpolate the values of temp, salt, u and v velocity in time to current julian date"""
-    Tdata=((grdSTATION.data[julianIndex,depthIndex1,0])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,0])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,0])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,0])*
-        (dwB/(dwA+dwB)))*dz2
-    Sdata=((grdSTATION.data[julianIndex,depthIndex1,1])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,1])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,1])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,1])*
-        (dwB/(dwA+dwB)))*dz2
-    Udata=((grdSTATION.data[julianIndex,depthIndex1,2])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,2])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,2])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,2])*
-        (dwB/(dwA+dwB)))*dz2
-    Vdata=((grdSTATION.data[julianIndex,depthIndex1,3])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,3])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,3])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,3])*
-        (dwB/(dwA+dwB)))*dz2
-    TauX=((grdSTATION.dataXY[julianIndex,0])*
-        (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,0])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.dataXY[julianIndex,0])*
-        (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,0])*
-        (dwB/(dwA+dwB)))*dz2
-    TauY=((grdSTATION.dataXY[julianIndex,1])*
-        (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,1])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.dataXY[julianIndex,1])*
-        (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,1])*
-        (dwB/(dwA+dwB)))*dz2
-    
-   
-    windX, windY = convertStressToWind(TauX,TauY)
-    #print '---> Maximum %s %f'%("windX", windX.max())
-    #print '---> Minimum %s %f'%("windY", windY.min())
-    
-    return Tdata,Sdata,Udata,Vdata, windX, windY
 
 def calculateLength(Larval_wgt, Larval_m):
     oldLarval_m = Larval_m
@@ -418,56 +346,7 @@ def calculateLength(Larval_wgt, Larval_m):
         #print 'Kept the old length', oldLarval_m, Larval_m
     return Larval_m
 
-def getAverageValues(inFile,lon,lat):
-    """inFile is the climatology file (e.g. averageSODA1961-1990.nc), while lat and lon is the
-    station longitude/latitude"""
-    numberOfPoints=4
-    grdMODEL = grd.grdClass(inFile,"AVERAGE")
-    
-    gridIndexes, dis = IOstation.getStationIndices(grdMODEL,lon,lat,'AVERAGE',numberOfPoints)
-    ave = Dataset(inFile,'r')
-    #for t in range(12):
-    #    test=ave.variables["temp"][1,:,:,t]
-    #    test=np.ma.masked_less(test,-1000)
-    #    contourf(np.squeeze(test),100)
-    #    show()
-    aveTemp=np.zeros((12),np.float64)
-    #aveSalt=np.zeros((12),np.float64)
-    #aveUvel=np.zeros((12),np.float64)
-    #aveVvel=np.zeros((12),np.float64)
-    
-    validIndex=[]; validDis=[]
-    for i in range(numberOfPoints):
-        latindex=int(gridIndexes[i][0])
-        lonindex=int(gridIndexes[i][1])
-        
-        """Test to see if station contains anything but missing values. If it does, we assume
-        this holds for salinity, u, and v as well. We also assume all values less than 10000"""
-        if any(abs(ave.variables["temp"][:,latindex,lonindex,:])< 10000):
-            validIndex.append(i)
-            validDis.append(dis[i])
-  
-    if not validIndex:
-        print 'No valid data found for position'
-        exit()
-    
-    for i in validIndex:
-        for month in range(12):
-            wgt=float(validDis[i])/sum(validDis)
-            latindex=int(gridIndexes[i][0])
-            lonindex=int(gridIndexes[i][1])
-            
-            """The values at a station is calculated by interpolating from the
-            numberOfPoints around the station uysing weights (wgt)
-            """
-            aveTemp[month] = aveTemp[month]  + np.mean((ave.variables["temp"][0:2,latindex,lonindex,month])*wgt)
-            #aveSalt[month] = aveSalt[month]  + np.mean(ave.variables["salt"][0:2,latindex,lonindex,month])*wgt
-            #aveUvel[month] = aveUvel[month]  + np.mean(ave.variables["u"][0:2,latindex,lonindex,month])*wgt
-            #aveVvel[month] = aveVvel[month]  + np.mean(ave.variables["v"][0:2,latindex,lonindex,month])*wgt
-    print "Finished storing average values for station into array"   
-    ave.close()
-    
-    return aveTemp
+
     
 def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval_mm,
                     julianIndex,julianFileA,julianFileB,
@@ -475,7 +354,7 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
     
     """==>INDEX calculations==============================="""
     depthIndex1, depthIndex2, dz1, dz2 = getDepthIndex(grdSTATION,depth)
-    Tdata,Sdata,Udata,Vdata,windX,windY = getData(julian,julianIndex,julianFileA,
+    Tdata,Sdata,Udata,Vdata,windX,windY = IOnetcdf.getData(julian,julianIndex,julianFileA,
                                       julianFileB,dz1,dz2,depthIndex1,
                                       depthIndex2,grdSTATION)
                         
@@ -500,10 +379,9 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
   
     """FOOD == Calculate seasonal prey density based on temperature and phytoplankton"""
     currentDate = grdSTATION.refDate + datetime.timedelta(seconds=julian)
-    if clim is False:
-        Tanomaly = (Tdata - grdSTATION.aveT[int(currentDate.month-1)]) / (grdSTATION.aveT.max() - grdSTATION.aveT.min())
-    else:
-        Tanomaly = 0.0
+    
+    #Tanomaly = (Tdata - grdSTATION.aveT[int(currentDate.month-1)]) / (grdSTATION.aveT.max() - grdSTATION.aveT.min())
+    Tanomaly = 0.0
         
     if grdSTATION.relativeSeawifsValue > 0.01:
         P = Tanomaly + grdSTATION.relativeSeawifsValue
@@ -516,7 +394,7 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
     Em = (Larval_mm**2.0)/(contrast*0.1*0.2*0.75) #Size-specific sensitivity of the visual system (Fiksen,02)
     
     for j in range(7):
-    #j=1
+    
         IER=0; R[j]=0.0 #R[j]=np.sqrt(Em*contrast*(calanus_Area[j])*(Eb/(Ke_larvae+Eb)))
         """All input to getr is either in m (or per m), or in mm (or per mm)"""
         R[j], IER = perception.perception.getr(R[j],beamAttCoeff/m2mm,contrast,calanus_Area[j],Em,Ke_larvae,Eb, IER)
@@ -545,20 +423,21 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
   
     return ing,GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness, MultiplyPrey*(prey+1)*P
    
-def getMaxMinDepths(oldDepth,maxHourlyMove):
+def getMaxMinDepths(oldDepth,maxHourlyMove,grdSTATION):
     """The value you give deepstDepthAllowed will be the absolute deepest
-    depth the larvae will move to. Useful to set this depth equal to bottom."""
-    deepstDepthAllowed=50.
-    if (oldDepth>maxHourlyMove and oldDepth+maxHourlyMove < deepstDepthAllowed):
+    depth the larvae will move to. Useful to set this depth equal to bottom.
+    grdSTATION.deepestDepthAllowed is defined from data in function IOnetcdf.getData"""
+    
+    if (oldDepth>maxHourlyMove and oldDepth+maxHourlyMove < grdSTATION.deepestDepthAllowed):
         h_start = oldDepth - maxHourlyMove
         h_end   = oldDepth + maxHourlyMove
 
     elif (oldDepth <= maxHourlyMove):
         h_start=0.0
-        h_end=min(deepstDepthAllowed,oldDepth + maxHourlyMove)
-    elif (oldDepth + maxHourlyMove >= deepstDepthAllowed):
+        h_end=min(grdSTATION.deepestDepthAllowed,oldDepth + maxHourlyMove)
+    elif (oldDepth + maxHourlyMove >= grdSTATION.deepestDepthAllowed):
         h_start=max(1,oldDepth-maxHourlyMove)
-        h_end=deepstDepthAllowed
+        h_end=grdSTATION.deepestDepthAllowed
     else:
         print 'STOP: Depth error (ibm.py:getMaxMinDepths)'
     
@@ -571,7 +450,7 @@ def calculateAttenuationCoeff(Chla):
     k0 = 0.1
     return k0 + 0.054*Chla**(2./3.) + 0.0088*Chla
     
-def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None,clim=None):
+def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None):
     """Create a date object to keep track of Julian dates etc.
     Also create a reference date starting at 1948/01/01.
     Go here to check results:http://lena.gsfc.nasa.gov/lenaDEV/html/doy_conv.html
@@ -639,9 +518,11 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None,clim=None):
             elif grdSTATION.time[i]*86400 >= JDend and FOUND is False:
                 print "Found first time index that fits end point:"
                 print "%s at index %i => %s\n"%(refDate + datetime.timedelta(seconds=grdSTATION.time[i]*86400),i,JDend)
-                grdSTATION.endIndex=i+1
+                grdSTATION.endIndex=i
+            
                 grdSTATION.end_date = refDate + datetime.timedelta(seconds=grdSTATION.time[i]*86400)
                 FOUND=True
+    
     print "Total number of days extracted: %s"%(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
     
     grdSTATION.JDend=JDend
@@ -649,13 +530,18 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None,clim=None):
     grdSTATION.totalDays=(grdSTATION.time[grdSTATION.endIndex]-grdSTATION.time[grdSTATION.startIndex])
 
         
-def updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim):
+def updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION):
     """This routine makes sure that we are reading at the correct time indices
     in the input data. If we have moved forward in time enough to move past the current time window of two
     time stamps, then update the indices and give the new indices.
     Remember that input time format from netCDF files must be
     'Days since 1948.1.1'
     """
+    refDate    = datetime.datetime(1948,1,1,0,0,0)
+   # print "searching: \n%s \n%s \n%s"%(refDate + datetime.timedelta(seconds=julianFileA),
+   #                                    refDate + datetime.timedelta(seconds=julian),
+   #                                    refDate + datetime.timedelta(seconds=julianFileB))
+   
     if julian >=julianFileB and julian < grdSTATION.JDend:
         julianIndex=julianIndex+1
         julianFileA=grdSTATION.time[julianIndex]*86400
@@ -666,6 +552,7 @@ def updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim
         fileIndices for where in the input files you interpolate from between each individual.
         Therefore, here we search backwards to find the correct start and stop indices for the new
         individual."""
+        
         while julian < julianFileB and julian < julianFileA:
             julianIndex=julianIndex-1
             julianFileA=grdSTATION.time[julianIndex]*86400
@@ -691,7 +578,7 @@ def ibm(station,stationName,stationNumber,event):
     """
     Read the netcdf file and create the input arrays needed by the ibm
     """
-    grdSTATION, clim, outputFile, Ncohorts, Finish, seawifsArray = init(station,stationName,event)
+    grdSTATION, outputFile, Ncohorts, Finish, seawifsArray = init(station,stationName,event)
     
     """Start time in days, hours, and seconds since 1948,1,1"""
     time=grdSTATION.startDate - grdSTATION.refDate 
@@ -745,7 +632,7 @@ def ibm(station,stationName,stationNumber,event):
     grdSTATION.dayOfYear = -9
     if randomWgt==1: print "RANDOM WEIGHT INITIALIZED"
     
-    W[:,:,:,:]         = initWgt + ((initWgt*0.1)* (np.random.random_sample(W.shape))*np.random.random_integers(-1,1,W.shape)*randomWgt) # milligram (5mm larvae) 
+    W[:,:,:,:]         = initWgt + ((initWgt*0.5)* (np.random.random_sample(W.shape))*np.random.random_integers(-1,1,W.shape)*randomWgt) # milligram (5mm larvae) 
     W_AF[:,:,:,:]      = initWgt
     S[:,:,:,:]         = stomach_threshold*gut_size*W # 30% av max mageinnhold
     L[:,:,:,:]         = calculateLength(initWgt, 0.0)
@@ -762,7 +649,6 @@ def ibm(station,stationName,stationNumber,event):
     """==================LOOP STARTS====================="""
     """Loop over all the days of interest"""
     
-     
     for day in range(Ntime):
         if loopsDone : break
         """Save the julian date and the time index so that you can reset time between each chohort and indiviual you run"""
@@ -779,7 +665,7 @@ def ibm(station,stationName,stationNumber,event):
             grdSTATION.relativeSeawifsValue = seawifsValue / maxSeawifsValue
             grdSTATION.seawifsValue = seawifsValue 
             #print "Food availability is defined by seawifs for month %i and station %s: %s"%(index+1,stationNumber,grdSTATION.relativeSeawifsValue)
-           #TODO: add seawifs relative prey value to calculateGrowth function
+          
             
         """loop over all the cohorts of interest"""
         noOneLeft=True
@@ -834,7 +720,7 @@ def ibm(station,stationName,stationNumber,event):
                                 """Since we split hour into parts, the new hour variable is h"""   
                                 h = deltaH*1.0*hour
                                
-                                oldDepth,optDepth,sampleDepths,maxDiffZ,oldFitness = initBehavior(depth,maxHourlyMove)
+                                oldDepth,optDepth,sampleDepths,maxDiffZ,oldFitness = initBehavior(depth,maxHourlyMove,grdSTATION)
                                 gtime=grdSTATION.refDate + datetime.timedelta(seconds=julian)
                                 
                                 """LIGHT == Get the maximum light at the current latitude, and the current surface light at the current time.
@@ -934,9 +820,9 @@ def ibm(station,stationName,stationNumber,event):
                                     larvaTime.append(julian/3600.)
                                     
                                
-                                julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim)
+                                julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION)
                                 s1=int(startAndStopIndex[cohort,ind,0])
-                                
+                              
                                 Age[cohort,ind,prey] =julian/3600.-larvaTime[s1]
                                 
                                 """Update time"""
@@ -971,7 +857,7 @@ def ibm(station,stationName,stationNumber,event):
                                 julian=oldJulian
                                 t=oldT
                           
-                            julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION,clim)
+                            julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION)
                             hour=0
                     ind=0
         if loopsDone is False:
