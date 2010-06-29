@@ -11,32 +11,32 @@ __status__   = "Production"
 
 """
 ====================================================================
-Define global 
+Define global
 Variables that are imported to ibm.py using from initLarva import *
 ====================================================================
 """
 
 """Number of release dates and cohorts. This will be lowered if NReleaseDatesInit*daysBetweenReleases is
 more than total number of simulation days : see function init in ibm.py"""
-NReleaseDatesInit=150
-daysBetweenReleases=10
-Nlarva=1
+NReleaseDatesInit=500
+daysBetweenReleases=30
+Nlarva=2
 NDaysAlive=30
 Nprey=1
 initWgt=0.09 #wgt in milligrams
 initDepth=15
 randomWgt=1 #1=on, 0=off Initialize weight with random values from initWgt
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
-MultiplyPrey=10
+MultiplyPrey=20
 
 missingValue=-9.99e-35
-dt      = 3600                   
+dt      = 3600
 sec2day = 1.0/86400.0
 gut_size= 0.06
 stomach_threshold = 0.3
-tau   = 2.0                     
+tau   = 2.0
 omega = 0.0
-f     = 0.43                 
+f     = 0.43
 pi    = np.pi
 mm2m  = 0.001
 m2mm  = 1000.
@@ -45,13 +45,13 @@ micro2m = 0.001
 contrast = 0.3 #Inherent contrast after Fiksen,02
 mm2m = 0.001
 mg2ug=1000.0
-C2 = 0.05                     
+C2 = 0.05
 act = 1
-a = (0.01/3600.)*dt;            
-b = -1.3 
-Pe = 0                        
+a = (0.01/3600.)*dt;
+b = -1.3
+Pe = 0
 Ke_larvae = 1
-Ke_predator = 1              
+Ke_predator = 1
 attCoeff = 0.18
 beamAttCoeff=attCoeff*3.0
 FishDens = 0.00015	#Predation from fish depends on density of predators
@@ -61,7 +61,7 @@ costRateOfMetabolism=0.25 # The rate of how much full swimming for one time step
 """Here you define how many time steps you want per 24 hours"""
 dt_per_day=24
 deltaH = 24./(dt_per_day*1.0)	#Hours per timestep
-   
+
 """Here you define the vertical resolution of behavior and movement meter
 deltaZ=0.1 = 10 cm increments, deltaZ=0.05 is 5 cm increments. If resolution is less than 1 meter,
 make sure that lastDecimal is larger than zero. lastDecimal=1 : 0.56=>0.6"""
@@ -77,10 +77,8 @@ calanus_Area=np.zeros(len(calanus_L2))
 """Calculate the image area (mm^2) of elongated prey"""
 for i in range(len(calanus_L1)):
     calanus_Area[i]=0.75*(calanus_L1[i])*(calanus_L2[i])
-    
+
 """Settings for progressbar"""
 empty  =u'\u25FD'
 filled =u'\u25FE'
 progress  = progressBar(color='red',width=30, block=filled.encode('UTF-8'), empty=empty.encode('UTF-8'))
-
-    

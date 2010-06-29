@@ -8,13 +8,14 @@ __email__    = 'trond.kristiansen@imr.no'
 __created__  = dt.datetime(2008, 6, 10)
 __modified__ = dt.datetime(2009, 12, 2)
 __version__  = "1.2"
-__status__   = "Production"
+__status__   = "Production, 10.6.2008,2.12.2009, 24.06.2010"
 
 def getStationData(cdf, varlist, grdSTATION, log, stationName):
     """
     This routine reads a netCDF4 file created using IOstation.py in soda2roms. Such
     a file only contain information for one lat/long location and is therefore different
     from finding values in a grid. Trond Kristiansen, 4.6.2009 on flight to Raleigh/Durham CO330
+    Edited in Bergen 24.06.2010.
     """
     Nvars=len(varlist)
     t= (grdSTATION.endIndex+1-grdSTATION.startIndex)
@@ -27,13 +28,14 @@ def getStationData(cdf, varlist, grdSTATION, log, stationName):
     grdSTATION.time=cdf.variables['time'][grdSTATION.startIndex:grdSTATION.endIndex+1]
    
     for var in varlist:
-        if var in ["taux","tauy","ssh"]:
+    
+        if var in ["taux","tauy","ssh","chla"]:
             var_array_rawXY[:,var_numberXY] = cdf.variables[var][grdSTATION.startIndex:grdSTATION.endIndex+1]
             var_numberXY=var_numberXY+1
         else:
             var_array_rawXYZ[:,:,var_numberXYZ] = cdf.variables[var][grdSTATION.startIndex:grdSTATION.endIndex+1,:]
             var_numberXYZ=var_numberXYZ+1
-                
+                  
         """
         Slice the data in the netcdf file that you want to keep. In our case we store a time-series from
         a station (eta_rho, xi_rho), from top to bottom. The variables extracted at this station are
@@ -44,11 +46,11 @@ def getStationData(cdf, varlist, grdSTATION, log, stationName):
     grdSTATION.data=var_array_rawXYZ
     grdSTATION.dataXY=var_array_rawXY
     grdSTATION.lat = float(cdf.variables['lat'][:])
-    
+   
     """Find and set the deepest depth for this station based on the depth range where you have
     valid data to use. Trond Kristiansen, 17.06.2010"""
     maxDepth=0; index=0
-    for k in range(len(grdSTATION.data[:,0])):
+    for k in range(len(grdSTATION.data[0,:])):
         if ( abs(grdSTATION.data[0,k,0]) < 1000.):
             maxDepth = grdSTATION.depth[k]
             index=k
@@ -58,62 +60,103 @@ def getStationData(cdf, varlist, grdSTATION, log, stationName):
     print "\nIOnetcdf.getData => Maximum depth for station %s has been set to: %s"%(stationName,grdSTATION.deepestDepthAllowed)
         
     if log is True:
-        k=0
+        kXYZ=0;kXY=0
         for var in varlist:
             print "\n---> Extracted time series of %s from station %s"%(var,stationName)
-            if var in ["taux","tauy","ssh"]:
-                print '---> Maximum %s %3.4f'%(var, grdSTATION.data[:,k].max())
-                print '---> Minimum %s %3.4f'%(var, grdSTATION.data[:,k].min())
-                print '---> Mean %s %3.4f +-%3.4f'%(var, np.mean(grdSTATION.data[:,k]), np.std(grdSTATION.data[:,k]))
+            if var in ["taux","tauy","ssh","chla"]:
+                print '---> Maximum %s %3.6f'%(var, grdSTATION.dataXY[:,kXY].max())
+                print '---> Minimum %s %3.6f'%(var, grdSTATION.dataXY[:,kXY].min())
+                print '---> Mean %s %3.6f +-%3.6f'%(var, np.mean(grdSTATION.dataXY[:,kXY]), np.std(grdSTATION.dataXY[:,kXY]))
+                kXY+=1
             else:
-                print '---> Maximum %s %3.4f'%(var, grdSTATION.data[:,0:index,k].max())
-                print '---> Minimum %s %3.4f'%(var, grdSTATION.data[:,0:index,k].min())      
-                print '---> Mean %s %3.4f +-%3.4f'%(var, np.mean(grdSTATION.data[:,0:index,k]), np.std(grdSTATION.data[:,0:index,k]))
-            k+=1
+                print '---> Maximum %s %3.6f'%(var, grdSTATION.data[:,0:index,kXYZ].max())
+                print '---> Minimum %s %3.6f'%(var, grdSTATION.data[:,0:index,kXYZ].min())      
+                print '---> Mean %s %3.6f +-%3.6f'%(var, np.mean(grdSTATION.data[:,0:index,kXYZ]), np.std(grdSTATION.data[:,0:index,kXYZ]))
+                kXYZ+=1
             
-def getData(julian,julianIndex,julianFileA,julianFileB,dz1,dz2,depthIndex1,depthIndex2,grdSTATION):
+def getData(julian,julianIndex,julianFileA,julianFileB,dz1,dz2,depthIndex1,depthIndex2,grdSTATION,event):
     """Calculate weights to use on input data from file"""
     dwB = abs(julian) - abs(julianFileA)
     dwA = abs(julianFileB) - abs(julian)
    
-    """Interpolate the values of temp, salt, u and v velocity in time to current julian date"""
-    Tdata=((grdSTATION.data[julianIndex,depthIndex1,0])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,0])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,0])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,0])*
-        (dwB/(dwA+dwB)))*dz2
-    Sdata=((grdSTATION.data[julianIndex,depthIndex1,1])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,1])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,1])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,1])*
-        (dwB/(dwA+dwB)))*dz2
-    Udata=((grdSTATION.data[julianIndex,depthIndex1,2])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,2])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,2])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,2])*
-        (dwB/(dwA+dwB)))*dz2
-    Vdata=((grdSTATION.data[julianIndex,depthIndex1,3])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,3])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,3])*
-        (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,3])*
-        (dwB/(dwA+dwB)))*dz2
-    TauX=((grdSTATION.dataXY[julianIndex,0])*
-        (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,0])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.dataXY[julianIndex,0])*
-        (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,0])*
-        (dwB/(dwA+dwB)))*dz2
-    TauY=((grdSTATION.dataXY[julianIndex,1])*
-        (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,1])*
-        (dwB/(dwA+dwB)))*dz1 +((grdSTATION.dataXY[julianIndex,1])*
-        (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,1])*
-        (dwB/(dwA+dwB)))*dz2
+    if event != "ESM RUN":
+        """Interpolate the values of temp, salt, u and v velocity in time to current julian date"""
+        Tdata=((grdSTATION.data[julianIndex,depthIndex1,0])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,0])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,0])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,0])*
+            (dwB/(dwA+dwB)))*dz2
+        Sdata=((grdSTATION.data[julianIndex,depthIndex1,1])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,1])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,1])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,1])*
+            (dwB/(dwA+dwB)))*dz2
+        Udata=((grdSTATION.data[julianIndex,depthIndex1,2])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,2])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,2])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,2])*
+            (dwB/(dwA+dwB)))*dz2
+        Vdata=((grdSTATION.data[julianIndex,depthIndex1,3])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,3])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,3])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,3])*
+            (dwB/(dwA+dwB)))*dz2
+        TauX=((grdSTATION.dataXY[julianIndex,0])*
+            (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,0])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.dataXY[julianIndex,0])*
+            (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,0])*
+            (dwB/(dwA+dwB)))*dz2
+        TauY=((grdSTATION.dataXY[julianIndex,1])*
+            (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,1])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.dataXY[julianIndex,1])*
+            (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,1])*
+            (dwB/(dwA+dwB)))*dz2
+        windX, windY = convertStressToWind(TauX,TauY)
+        #print '---> Maximum %s %f'%("windX", windX.max())
+        #print '---> Minimum %s %f'%("windY", windY.min())
     
-   
-    windX, windY = convertStressToWind(TauX,TauY)
-    #print '---> Maximum %s %f'%("windX", windX.max())
-    #print '---> Minimum %s %f'%("windY", windY.min())
-    
-    return Tdata,Sdata,Udata,Vdata, windX, windY
+        return Tdata,Sdata,Udata,Vdata, windX, windY
+
+    else:
+        """Interpolate the values of temp, salt, u and v velocity in time to current julian date.
+        Note that the indices for 2D and 3D values are different and must be set accordingly to
+        the order the 2D and 3D variables are stored into arrays. The order is defined by the order they appear
+        in vars list defined in init funtion."""
+        Tdata=((grdSTATION.data[julianIndex,depthIndex1,0])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,0])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,0])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,0])*
+            (dwB/(dwA+dwB)))*dz2
+        NSMdata=((grdSTATION.data[julianIndex,depthIndex1,1])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,1])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,1])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,1])*
+            (dwB/(dwA+dwB)))*dz2
+        NLGdata=((grdSTATION.data[julianIndex,depthIndex1,2])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex1,2])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.data[julianIndex,depthIndex2,2])*
+            (dwA/(dwA+dwB))+(grdSTATION.data[julianIndex+1,depthIndex2,2])*
+            (dwB/(dwA+dwB)))*dz2
+        CHLAdata=((grdSTATION.dataXY[julianIndex,0])*
+            (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,0])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.dataXY[julianIndex,0])*
+            (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,0])*
+            (dwB/(dwA+dwB)))*dz2
+        TauX=((grdSTATION.dataXY[julianIndex,1])*
+            (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,1])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.dataXY[julianIndex,1])*
+            (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,1])*
+            (dwB/(dwA+dwB)))*dz2
+        TauY=((grdSTATION.dataXY[julianIndex,2])*
+            (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,2])*
+            (dwB/(dwA+dwB)))*dz1 +((grdSTATION.dataXY[julianIndex,2])*
+            (dwA/(dwA+dwB))+(grdSTATION.dataXY[julianIndex+1,2])*
+            (dwB/(dwA+dwB)))*dz2
+        windX, windY = convertStressToWind(TauX,TauY)
+      #  print '---> Maximum %s %f'%("windX", windX.max())
+      #  print '---> Minimum %s %f'%("windY", windY.min())
+        
+        return Tdata,NSMdata,NLGdata,CHLAdata,windX,windY
 
 
 def convertStressToWind(TauX,TauY):
