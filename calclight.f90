@@ -1,7 +1,7 @@
       
 Module calclight
         implicit none
-        ! f2py --verbose --fcompiler=intelem -c -m calclight calclight.f90        
+        ! f2py --verbose --fcompiler=intelem -c -m calclight calclight.f90 -DF2PY_REPORT_ON_ARRAY_COPY=1 
         contains
   
             subroutine qsw(radfl0,radmax,cawdir,clouds,rlat,time,daysinyear)

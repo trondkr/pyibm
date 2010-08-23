@@ -22,8 +22,6 @@ if os.path.isdir(dirMine):
 import grd
 import IOverticalGrid
 import IOtime
-#import IOlight
-#import date
 import IOnetcdf
 import predation
 from initLarva import *
@@ -120,9 +118,6 @@ def init(station,stationName,event):
         aveTemp = IOnetcdf.getAverageValues(inFile,grdSTATION.lon,grdSTATION.lat)
         grdSTATION.aveT=aveTemp
 
-    if event == "COLD":
-        varlist=['temp','salt','u','v','taux','tauy'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton
-
     if event == "REGULAR RUN":
         varlist=['temp','salt','u','v','taux','tauy'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
         startDate = datetime.datetime(1970,4,1,0,0,0)
@@ -136,10 +131,11 @@ def init(station,stationName,event):
     if event == "ESM RUN":
         varlist=['temp','salt','nlg','nsm','chla','taux','tauy'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
         startDate = datetime.datetime(2002,1,15,1,0,0)
-        endDate   = datetime.datetime(2035,12,14,0,0,0)
+        endDate   = datetime.datetime(2050,12,14,0,0,0)
         grdSTATION.chlaValue=0.0
 
     if event == 'COLD' or event=='WARM':
+        varlist=['temp','salt','u','v','taux','tauy']
         startDate, endDate = coldWarmEvent(stationName,event)
 
     """Get the time information and find the indices for start and stop data to extract relative to
@@ -177,7 +173,7 @@ def init(station,stationName,event):
     """Calculate release dates for individual cohorts based on days since start date of simulations."""
     listOfReleaseDates.append(startDate)
 
-    for i in range(NReleaseDatesInit):
+    for i in xrange(NReleaseDatesInit):
         date=startDate+datetime.timedelta(daysBetweenReleases*(i+1))
         if endDate >= date + datetime.timedelta(days=NDaysAlive):
             listOfReleaseDates.append(date)
@@ -186,7 +182,7 @@ def init(station,stationName,event):
     grdSTATION.listOfReleaseDates=listOfReleaseDates
 
     print "\nThis simulation will release a total of %s cohorts on the following dates:"%(NReleaseDates)
-    for h in range(NReleaseDates):
+    for h in xrange(NReleaseDates):
         print "--> %s"%(listOfReleaseDates[h])
     print "\n"
 
@@ -203,16 +199,16 @@ def init(station,stationName,event):
 
 def findActiveCohorts(isDead,isReleased):
     co=0; co2=0
-    for check in range(len(isDead)):
+    for check in xrange(len(isDead)):
         if isDead[check]==True: co+=1
 
-    for check in range(len(isReleased)):
+    for check in xrange(len(isReleased)):
         if isReleased[check]==True: co2+=1
-    activeCohorts=co2-co
+    activeCohorts=np.abs(co2-co)
     minNumberOfActiveCohort = co
-    #print "213: There are currently %s active cohorts in the simulation with min cohort %s"%(activeCohorts,minNumberOfActiveCohort)
+    #print "209: There are currently %s active cohorts in the simulation with min cohort %s"%(activeCohorts,minNumberOfActiveCohort)
 
-    return activeCohorts, minNumberOfActiveCohort
+    return minNumberOfActiveCohort
 
 def checkReleased(releaseDate,julian,grdSTATION):
 
@@ -238,7 +234,7 @@ def checkReleased(releaseDate,julian,grdSTATION):
     return release, isReleased, releaseDate
 
 
-def isAlive(julian,larvaAge,cohort,ind,t,prey,startAndStop,isDead):
+def isAlive(julian,larvaAge,cohort,isDead):
 
     if isDead[cohort]==False:
         #print "Larva is %s days old and belongs to cohort %s %s"%(larvaAge/(24.),cohort, NDaysAlive)
@@ -251,7 +247,7 @@ def isAlive(julian,larvaAge,cohort,ind,t,prey,startAndStop,isDead):
     else:
         isAliveBool=False
 
-    return isAliveBool, startAndStop
+    return isAliveBool
 
 
 def getDepthIndex(grdSTATION,depth):
@@ -289,7 +285,7 @@ def initBehavior(depth,maxHourlyMove,grdSTATION):
     sampleDepths=[]
     maxDiff=0.0
     if oldDepth  == 0.0:
-        for i in range(NOptDepths+1):
+        for i in xrange(NOptDepths+1):
             newDepth = oldDepth + float(deltaZ)*(float(i))
             if newDepth <0: newDepth=0.0
             if newDepth < h_start: newDepth=h_start
@@ -299,7 +295,7 @@ def initBehavior(depth,maxHourlyMove,grdSTATION):
                 if abs(newDepth-oldDepth) > maxDiff: maxDiff=abs(newDepth-oldDepth)
     else:
         # Move down into the water column limited by h_stop
-        for i in range(NOptDepths/2):
+        for i in xrange(NOptDepths/2):
             newDepth = oldDepth + float(deltaZ)*(NOptDepths/2 - float(i))
             if newDepth <0: newDepth=0.0
 
@@ -307,7 +303,7 @@ def initBehavior(depth,maxHourlyMove,grdSTATION):
             if newDepth not in sampleDepths:
                 sampleDepths.append(newDepth)
                 if abs(newDepth-oldDepth) > maxDiff: maxDiff=abs(newDepth-oldDepth)
-        for i in range(NOptDepths/2+1):
+        for i in xrange(NOptDepths/2+1):
             newDepth = oldDepth - float(deltaZ)*((float(i)))
             if newDepth <0: newDepth=0.0
             if newDepth < h_start: newDepth=h_start
@@ -323,7 +319,7 @@ def initBehavior(depth,maxHourlyMove,grdSTATION):
 
 def getBehavior(stomachFullness,F,m,length,oldFitness,depth,optDepth):
     """Rule 4 of Behavioral Ecology paper - Kristiansen et al. 2009"""
-    T=min(0.8,0.3+1000.0*(1+(length)*np.exp(length))**(-1))
+    T=min(0.9,0.3+1000.0*(1+(length)*np.exp(length))**(-1))
 
     #print "behavior ", T, length, 0.3+1000.0*(1+(length)*np.exp(length))**(-1), length
     if stomachFullness > T:
@@ -391,9 +387,10 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
 
     """FOOD == Calculate seasonal prey density based on temperature and phytoplankton"""
     currentDate = grdSTATION.refDate + datetime.timedelta(seconds=julian)
-
-    #Tanomaly = (Tdata - grdSTATION.aveT[int(currentDate.month-1)]) / (grdSTATION.aveT.max() - grdSTATION.aveT.min())
-    Tanomaly = 0.0
+    if event!="ESM RUN":
+        Tanomaly = (Tdata - grdSTATION.aveT[int(currentDate.month-1)]) / (grdSTATION.aveT.max() - grdSTATION.aveT.min())
+    else:
+        Tanomaly = 0.0
 
     if grdSTATION.seawifs is True:
         if grdSTATION.relativeSeawifsValue > 0.01:
@@ -407,32 +404,37 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
 
     """VISUAL == PERCEPTION of PREY calculations==============================="""
     Em = (Larval_mm**2.0)/(contrast*0.1*0.2*0.75) #Size-specific sensitivity of the visual system (Fiksen,02)
+    ing[:]=0.0; enc[:]=0.0; hand[:]=0.0; pca[:]=0.0
 
-    for j in range(7):
+    for j in xrange(16):
 
-        IER=0; R[j]=0.0 #R[j]=np.sqrt(Em*contrast*(calanus_Area[j])*(Eb/(Ke_larvae+Eb)))
+        IER=0; R[j]=0.0 #R[j]=np.sqrt(Em*contrast*(prey_AREA[j])*(Eb/(Ke_larvae+Eb)))
         """All input to getr is either in m (or per m), or in mm (or per mm)"""
-        R[j], IER = perception.perception.getr(R[j],beamAttCoeff/m2mm,contrast,calanus_Area[j],Em,Ke_larvae,Eb, IER)
-
+        R[j], IER = perception.perception.getr(R[j],beamAttCoeff/m2mm,contrast,prey_AREA[j],Em,Ke_larvae,Eb, IER)
+        pca[j] = max(0.0,min(1.0,-16.7*(prey_LENGTH[j]/Larval_mm) + 3.0/2.0))
         """If you don't have fortran compiler use python routine for visual range"""
         #visual = np.sqrt(Em*contrast*(Ap_calanus*m2mm)*(Eb/(Ke_larvae+Eb)))
         #R[j] = (IOlight.getPerceptionDistance(Em,attCoeff,Ke_larvae,Ap_calanus,Eb))*m2mm
 
-        """Calculate turbulence based on wind stress"""
-        epsilon=(5.82*1.E-9*((np.sqrt(windX**2 + windY**2)))**3.)/(depth+0.1)
-        omega = 1.9*(epsilon*R[j]*mm2m)**0.667
-        omega =  omega * m2mm # From m/s to mm/s
+    """Calculate turbulence based on wind stress"""
+    epsilon=(5.82*1.E-9*((np.sqrt(windX**2 + windY**2)))**3.)/(depth+0.1)
+    omega = 1.9*(epsilon*R[:]*mm2m)**0.667
+    omega =  omega * m2mm # From m/s to mm/s
 
-        """Calculate handling time, encounter rate, and probability of capture"""
-        hand[j] = 0.264*10**(7.0151*(calanus_L1[j]/Larval_mm)) # Walton 1992
-        enc[j] = ((0.667*np.pi*(R[j]**3.)*f + np.pi*(R[j]**2.)*np.sqrt(calanus_L1[j]**2.+ 2.*omega**2.)*f*tau) * (calanus_D[j]*((prey+1)*MultiplyPrey*P))* ltr2mm3)
+    """Calculate handling time, encounter rate, and probability of capture"""
+    hand[:] = 0.264*10**(7.0151*(prey_LENGTH[:]/Larval_mm)) # Walton 1992
+    enc[:] = ((0.667*np.pi*(R[:]**3.)*f + np.pi*(R[:]**2.)*np.sqrt(prey_LENGTH[:]**2.+ 2.*omega**2.)*f*tau) * (prey_D[:]*((prey+1)*MultiplyPrey*P))* ltr2mm3)
 
-        pca[j] = max(0.0,min(1.0,-16.7*(calanus_L1[j]/Larval_mm) + 3.0/2.0))
-        #print "j: ",j, " enc:",enc[j]*dt*deltaH, " mm:",Larval_mm, "pca:",pca[j]
-        """Calculate ingestion rate"""
-        ing[j] = (dt*enc[j]*pca[j]*calanus_W[j]*micro2m / (1 + hand[j]))*deltaH
-        #print gut_size*Larval_wgt, Spre + sum(ing), (Larval_wgt*gut_size), "\n"
-        #print "j:",j, "ing:",ing[j], "hour:",hour, "stomachfull:", (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size), "\n"
+
+   # print "j: ",j, " enc:",enc[j]*dt*deltaH, " mm:",Larval_mm, "pca:",pca[j], "SPpl:",prey_D[j]
+  #  print "prey density: %s"%(sum(prey_D[:]*((prey+1)*MultiplyPrey*P)))
+    """Calculate ingestion rate"""
+    ing[:] = (dt*enc[:]*pca[:]*prey_WGT[:]*micro2m / (1 + hand[:]))*deltaH
+
+   # print "j:",j, "ing:",ing[j], "hour:",hour, "stomachfull:", (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size), "\n"
+    #for j in range(16):
+    #    print "ingestion %s: %s"%(j,ing[j])
+    #print "\n"
     """Calculate stomach fullness"""
     stomachFullness =  (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size)
 
@@ -517,7 +519,7 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None,event=None):
         print "Time period to extract was found within the time period available in the file..."
         print "--> %s - %s"%(startDate,endDate)
 
-        for i in range(grdSTATION.time.shape[0]):
+        for i in xrange(grdSTATION.time.shape[0]):
 
             if grdSTATION.time[i]*86400  < JDstart:
                 FOUND=False
@@ -529,7 +531,7 @@ def getTimeIndices(cdf,grdSTATION,startDate=None,endDate=None,event=None):
                 grdSTATION.start_date = refDate + datetime.timedelta(seconds=grdSTATION.time[i-1]*86400)
                 FOUND=True
 
-        for i in range(grdSTATION.time.shape[0]):
+        for i in xrange(grdSTATION.time.shape[0]):
             if grdSTATION.time[i]*86400 < JDend:
                 FOUND=False
                 continue
@@ -614,7 +616,7 @@ def ibm(station,stationName,stationNumber,event):
     julianIndex=0
 
     """Create arrays to store all information in"""
-    Tlarva=(NDaysAlive+2)*(1.0*dt_per_day)
+    Tlarva=(NDaysAlive+1)*(1.0*dt_per_day) + 1
 
     print "Each larva will store information for %s timesteps: deltaH=%s"%(Tlarva,Tlarva/dt_per_day)
     W            =(np.zeros((Ncohorts,Nlarva,Tlarva,Nprey),dtype=np.float64))*missingValue
@@ -632,11 +634,11 @@ def ibm(station,stationName,stationNumber,event):
     larvaTdata   =(np.zeros((Ncohorts,Nlarva,Tlarva,Nprey),dtype=np.float64))*missingValue
     larvaNauplii =(np.zeros((Ncohorts,Nlarva,Tlarva,Nprey),dtype=np.float64))*missingValue
 
-    R=np.zeros(13,dtype=np.float64)
-    enc=np.zeros(13,dtype=np.float64)
-    hand=np.zeros(13,dtype=np.float64)
-    pca=np.zeros(13,dtype=np.float64)
-    ing=np.zeros(13,dtype=np.float64)
+    R=np.zeros(16,dtype=np.float64)
+    enc=np.zeros(16,dtype=np.float64)
+    hand=np.zeros(16,dtype=np.float64)
+    pca=np.zeros(16,dtype=np.float64)
+    ing=np.zeros(16,dtype=np.float64)
 
     grdSTATION.Initialized=False
     #grdSTATION.saveIndex=(Ncohorts,Ntime,Nlarva,Nprey)
@@ -646,30 +648,34 @@ def ibm(station,stationName,stationNumber,event):
     grdSTATION.Nprey=Nprey
     grdSTATION.larvaPsur=1.0
     grdSTATION.firstBatch=True
+    grdSTATION.firstRun=True
 
     t=1
     loopsDone = False
     grdSTATION.dayOfYear = -9
     if randomWgt==1: print "RANDOM WEIGHT INITIALIZED"
 
-    W[:,:,:,:]         = initWgt + ((initWgt*0.5)* (np.random.random_sample(W.shape))*np.random.random_integers(-1,1,W.shape)*randomWgt) # milligram (5mm larvae)
+    W[:,:,:,:]         = initWgt + ((initWgt*0.2)* (np.random.random_sample(W.shape))*np.random.random_integers(-1,1,W.shape)*randomWgt) # milligram (5mm larvae)
     W_AF[:,:,:,:]      = initWgt
     S[:,:,:,:]         = stomach_threshold*gut_size*W # 30% av max mageinnhold
     L[:,:,:,:]         = calculateLength(initWgt, 0.0)
 
     larvaTime=[]
-    released=[]
-    for i in range(Ncohorts): released.append(0)
 
     depth=initDepth
     releasedCohorts=0
     isDead=[]
-    for i in range(Ncohorts): isDead.append(False)
+    minNumberOfActiveCohort=0
+    releasedCohorts=0
+    released=[]
+    for i in xrange(Ncohorts):  released.append(0)
+   
+    for i in xrange(Ncohorts): isDead.append(False)
 
     """==================LOOP STARTS====================="""
     """Loop over all the days of interest"""
 
-    for day in range(Ntime):
+    for day in xrange(Ntime):
         if loopsDone : break
         """Save the julian date and the time index so that you can reset time between each chohort and indiviual you run"""
         oldJulian=julian
@@ -688,29 +694,41 @@ def ibm(station,stationName,stationNumber,event):
 
         """loop over all the cohorts of interest"""
         noOneLeft=True
-        for cohort in range(Ncohorts):
+        currentCohort=0
+        
+        for cohort in xrange(minNumberOfActiveCohort,releasedCohorts+1):
+           
             """For each day, and cohort, loop over all the individuals"""
-            a,b,c= checkReleased(grdSTATION.listOfReleaseDates[cohort],julian,grdSTATION)
-            release.append(a); isReleased.append(b); releaseDate.append(c)
-
-            if release[cohort] is True:
-           #     print "\nReleasing a new cohort on %s"%(releaseDate[cohort])
-                released[cohort]=t
-                isReleased[cohort]=True
-                releasedCohorts+=1
-                noOneLeft=False
-
-       # print "We have found %s cohorts that have been released"%(releasedCohorts)
-        for cohort in range(releasedCohorts):
-
-            if isReleased[cohort] is False:
+            if cohort >= len(grdSTATION.listOfReleaseDates):
+                continue
+            else:
+                a,b,c= checkReleased(grdSTATION.listOfReleaseDates[cohort],julian,grdSTATION)
+                release.append(a); isReleased.append(b); releaseDate.append(c); 
+                
+                if release[currentCohort] is True:
+               #     print "\nReleasing a new cohort on %s"%(releaseDate[currentCohort])
+                    released[cohort]=t
+                    isReleased[currentCohort]=True
+                   
+                    releasedCohorts+=1
+                    noOneLeft=False
+                
+                currentCohort+=1
+            
+   #     print "We have found %s cohorts that have been released"%(releasedCohorts)
+       
+        currentCohort=0
+        for cohort in xrange(minNumberOfActiveCohort,releasedCohorts):
+            #print "Checking # %s : cohorts from %s to %s : currentCohort %s"%(cohort,minNumberOfActiveCohort,releasedCohorts,currentCohort)
+          
+            if isReleased[currentCohort] is False:
                 continue
             elif released[cohort]!=0:
-                activeCohorts, minNumberOfActiveCohort = findActiveCohorts(isDead,isReleased)
+                minNumberOfActiveCohort = findActiveCohorts(isDead,isReleased)
+        
+                for prey in xrange(Nprey):
 
-                for prey in range(Nprey):
-
-                    for ind in range(Nlarva):
+                    for ind in xrange(Nlarva):
                         if loopsDone : break
                         """We create an array that controls the entrance and exit points in time for
                         a given larvae"""
@@ -721,7 +739,7 @@ def ibm(station,stationName,stationNumber,event):
                         """This is the index that counts the time for each individual larva"""
                         larvaIndex=t-startAndStop[cohort,ind,0]
 
-                        isAliveBool,startAndStop = isAlive(julian,Age[cohort,ind,prey],cohort,ind,t,prey,startAndStop,isDead)
+                        isAliveBool = isAlive(julian,Age[cohort,ind,prey],cohort,isDead)
                         if isAliveBool == False:
 
                             if noOneLeft==True and ind==(Nlarva-1) and cohort==(releasedCohorts-1) and prey==(Nprey-1):
@@ -738,7 +756,7 @@ def ibm(station,stationName,stationNumber,event):
                             maxHourlyMove=((swimSpeed*(dt/1000.))/2.0)*deltaH # Divided by four compared to original IBM in fortran
                             maxHourlyMove = round(maxHourlyMove,lastDecimal)
 
-                            for hour in range(dt_per_day):
+                            for hour in xrange(dt_per_day):
 
                                 """Since we split hour into parts, the new hour variable is h"""
                                 h = deltaH*1.0*hour
@@ -758,7 +776,7 @@ def ibm(station,stationName,stationNumber,event):
                                 in light caclualtions. Seemed better to use average values than extreme values.
                                 NOTE: Convert from W/m2 to umol/m2/s-1"""
                                 radfl0,maxLight,cawdir = calclight.calclight.qsw(radfl0,maxLight,cawdir,clouds,grdSTATION.lat*np.pi/180.0,dayOfYear,daysInYear)
-                                maxLight = maxLight/0.217 #radfl0/0.217
+                                maxLight = radfl0/0.217
                                 sunHeight, surfaceLight = calclight.calclight.surlig(hourOfDay,maxLight,dayOfYear,grdSTATION.lat,sunHeight,surfaceLight)
 
                                 """Find the attenuation coefficient as a function of Chlorophyll-a values"""
@@ -892,6 +910,7 @@ def ibm(station,stationName,stationNumber,event):
                             julianFileA, julianFileB,julianIndex, Finish = updateFileIndices(julian,julianIndex,julianFileB,julianFileA,grdSTATION)
                             hour=0
                     ind=0
+            currentCohort+=1
         if loopsDone is False:
             """Show progress indicator"""
             message='---> running IBMtime-step %s of %s with %s released cohorts (%s finished)'%(t,grdSTATION.refDate + datetime.timedelta(seconds=julian),releasedCohorts,minNumberOfActiveCohort)
@@ -906,9 +925,9 @@ if __name__=="__main__":
     except ImportError:
         pass
 
-    events = ['COLD', 'WARM']
-    events = ['REGULAR RUN']
-    events = ['CLIM RUN']
+    #events = ['COLD', 'WARM']
+    #events = ['REGULAR RUN']
+    #events = ['CLIM RUN']
     events=  ['ESM RUN']
 
     if events[0]=="REGULAR RUN" or events[0]=="COLD":
@@ -938,9 +957,11 @@ if __name__=="__main__":
                     "/Users/trond/Projects/ESM2/ESM-lofoten.nc",
                     "/Users/trond/Projects/ESM2/ESM-georges.nc"]
 
+
     """Notice that if you use seawifs data, the order of the stations here have to match
     The order of station seawifs data in seawifs file (see extractSeaWifs.py file)"""
     stationNames=['North Sea', 'Iceland','Lofoten', 'Georges Bank']
+ 
 
     stationNumber=0
 

@@ -19,15 +19,15 @@ Variables that are imported to ibm.py using from initLarva import *
 """Number of release dates and cohorts. This will be lowered if NReleaseDatesInit*daysBetweenReleases is
 more than total number of simulation days : see function init in ibm.py"""
 NReleaseDatesInit=500
-daysBetweenReleases=30
-Nlarva=2
+daysBetweenReleases=7
+Nlarva=1
 NDaysAlive=30
 Nprey=1
 initWgt=0.09 #wgt in milligrams
 initDepth=15
 randomWgt=1 #1=on, 0=off Initialize weight with random values from initWgt
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
-MultiplyPrey=20
+MultiplyPrey=85
 
 missingValue=-9.99e-35
 dt      = 3600
@@ -56,7 +56,7 @@ attCoeff = 0.18
 beamAttCoeff=attCoeff*3.0
 FishDens = 0.00015	#Predation from fish depends on density of predators
 deadThreshold=0.8   #Individuals die if weight is less than 70% of regular weight at length: predation.py (Fiksen et al. 2002)
-costRateOfMetabolism=0.25 # The rate of how much full swimming for one time step will cost relative to routine metabolism
+costRateOfMetabolism=0.5 # The rate of how much full swimming for one time step will cost relative to routine metabolism
 
 """Here you define how many time steps you want per 24 hours"""
 dt_per_day=24
@@ -68,15 +68,44 @@ make sure that lastDecimal is larger than zero. lastDecimal=1 : 0.56=>0.6"""
 deltaZ=1
 lastDecimal=0
 
-""" Initialize Calanus """
-calanus_D  = [0.3, 0.4, 0.2, 0.1, 0.05, 0.01, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] #(#/ltr)
-calanus_W  = [0.33, 0.49, 1., 1.51,2.09, 2.76, 4.18, 13.24, 23.13, 63.64, 169.58, 276.29, 276.29] #(micrograms)
-calanus_L1 = [0.22, 0.27, 0.4, 0.48, 0.55, 0.61, 0.79, 1.08, 1.38, 1.8, 2.43, 2.11, 2.11] #(length in mm)
-calanus_L2 = [0.1, 0.1, 0.1, 0.15,  0.18, 0.2, 0.22, 0.25, 0.31, 0.41, 0.52, 0.65, 0.65] #(width in mm)
-calanus_Area=np.zeros(len(calanus_L2))
+"""Generate generic prey size groups based on Daewel et al. 2008 JPR #30 paper.
+Here we divide the prey size spectra into 16 groups ranging from 0.1 to 1.6 mm in length.
+The width and weight of the prey were derived from the weight and width of Calanus
+of equal length. Calculations according to Daewel require length in microgram (converted to
+mm at the end for use in ibm)."""
+sizeMin=100. # micrograms (/1000 to get mm)
+sizeMax=1600.
+prey_LENGTH=[]
+"""Calculate the sizes based on a range of 16 from 100 to 1600 micrograms"""
+for i in range(16):
+    prey_LENGTH.append(sizeMin*(i+1))
+
+"""Calculate the density function of prey of a given size according to Daewel et al. 2008"""
+tm=0 # total biomass
+SDpl=np.zeros(16)
+SPpl=np.zeros(16)
+m=np.zeros(16)
+
+for i in range(16):
+    SDpl[i] = 695.73 * np.exp(-0.0083*prey_LENGTH[i])
+    m[i] = np.exp( 2.772 * np.log(prey_LENGTH[i]) - 7.476)
+    tm = tm+m[i]
+
+"""Here we calulate the percent of each size group represented as a biomass percent"""
+for i in range(16):
+    SPpl[i] = (SDpl[i] * m[i])/tm
+
+prey_WGT   = [0.1, 0.25, 0.45, 1.0, 1.51, 2.76, 3.76, 6.0, 9.0, 13.24, 15.0, 17.0, 19.0, 23.13, 30.0, 45.0]
+prey_WIDTH = [0.08, 0.1, 0.1, 0.1, 0.15, 0.17, 0.18, 0.2, 0.22, 0.25, 0.31, 0.35, 0.38, 0.38, 0.39, 0.40]
+
+prey_LENGTH= np.asarray(prey_LENGTH)/1000. #microgram to mm
+prey_D=np.asarray(SPpl)
+
+prey_AREA=np.zeros(len(prey_LENGTH))
 """Calculate the image area (mm^2) of elongated prey"""
-for i in range(len(calanus_L1)):
-    calanus_Area[i]=0.75*(calanus_L1[i])*(calanus_L2[i])
+for i in range(len(prey_LENGTH)):
+    prey_AREA[i]=0.75*(prey_LENGTH[i])*(prey_WIDTH[i])
+
 
 """Settings for progressbar"""
 empty  =u'\u25FD'
