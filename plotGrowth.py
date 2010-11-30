@@ -29,10 +29,6 @@ stationsWarm=["results/IBM_1990_station_Lofoten.nc",
               "results/IBM_1960_station_Iceland.nc",
               "results/IBM_1999_station_GeorgesBank.nc"]
 
-#stationsCold=["results/IBM_1977_station_Lofoten.nc"]
-
-#stationsWarm=["results/IBM_1990_station_Lofoten.nc"]
-
 latList=[67.5001, 54.5601, 63.7010,   41.6423]    
 stationNames=["Lofoten","North Sea","Iceland","Georges Bank"]
 
@@ -104,7 +100,7 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
                 widthIndex=index2-index1
              
                 for ind in range(Nindividuals):
-                    larvaSGR[cohort,ind,prey]=sum(sgr[cohort,ind,index1:index2,preyList[prey]])/days
+                    larvaSGR[cohort,ind,prey]=sum(sgr[cohort,ind,:,preyList[prey]])/days
                    
                     if stNumber==0 and prey==0:
                         timeSGR1[cohort]=time[index1]

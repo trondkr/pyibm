@@ -28,7 +28,9 @@ from initLarva import *
 """Import f2py Fortran modules"""
 import calclight
 import perception
+import bioenergetics
 import IOstation
+from memoize import memoize
 
 __author__   = 'Trond Kristiansen'
 __email__    = 'trond.kristiansen@imr.no'
@@ -130,8 +132,8 @@ def init(station,stationName,event):
 
     if event == "ESM RUN":
         varlist=['temp','salt','nlg','nsm','chla','taux','tauy'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
-        startDate = datetime.datetime(2002,1,15,1,0,0)
-        endDate   = datetime.datetime(2050,12,14,0,0,0)
+        startDate = datetime.datetime(2002,4,15,1,0,0)
+        endDate   = datetime.datetime(2002,8,14,0,0,0)
         grdSTATION.chlaValue=0.0
 
     if event == 'COLD' or event=='WARM':
@@ -235,7 +237,6 @@ def checkReleased(releaseDate,julian,grdSTATION):
 
 
 def isAlive(julian,larvaAge,cohort,isDead):
-
     if isDead[cohort]==False:
         #print "Larva is %s days old and belongs to cohort %s %s"%(larvaAge/(24.),cohort, NDaysAlive)
 
@@ -249,9 +250,10 @@ def isAlive(julian,larvaAge,cohort,isDead):
 
     return isAliveBool
 
-
+@memoize
 def getDepthIndex(grdSTATION,depth):
     depthFOUND=False; d=0
+    
     while d < len(grdSTATION.depth) and depthFOUND==False:
 
         if abs(grdSTATION.depth[d]) <= abs(depth) <= abs(grdSTATION.depth[d+1]) and depthFOUND==False:
@@ -347,30 +349,14 @@ def calculateLength(Larval_wgt, Larval_m):
     return Larval_m
 
 
-
-def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval_mm,
-                    julianIndex,julianFileA,julianFileB,
+def calculateGrowth(Tdata,NLGdata,windX,windY,julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval_mm,
                     R,enc,hand,ing,pca,Spre,prey,event):
-
-    """==>INDEX calculations==============================="""
-    depthIndex1, depthIndex2, dz1, dz2 = getDepthIndex(grdSTATION,depth)
-
-    if event != "ESM RUN":
-        Tdata,Sdata,Udata,Vdata,windX,windY = IOnetcdf.getData(julian,julianIndex,julianFileA,
-                                          julianFileB,dz1,dz2,depthIndex1,
-                                          depthIndex2,grdSTATION,event)
-    else:
-        Tdata,NSMdata,NLGdata,CHLAdata,windX,windY = IOnetcdf.getData(julian,julianIndex,julianFileA,
-                                          julianFileB,dz1,dz2,depthIndex1,
-                                          depthIndex2,grdSTATION,event)
-        grdSTATION.chlaValue=CHLAdata
-
 
     """Mouthsize of larvae. The larvae can only capture calanus of sizes less
     than the larval mouthsize. Folkvord et al."""
     m = np.exp (-3.27+1.818*np.log(Larval_mm)-0.1219*(np.log(Larval_mm))**2.)
     """Calculate metabolism"""
-    meta = dt*2.38e-7*np.exp(0.088*7)*((Larval_wgt*mg2ug)**(0.9)*0.001)*deltaH
+    meta = dt*2.38e-7*np.exp(0.088*Tdata)*((Larval_wgt*mg2ug)**(0.9)*0.001)*deltaH
     """Increase metabolism during active hours (light above threshold) Lough et  al. 2005"""
     if Eb > 0.001:
         if Larval_mm > 5.5: meta = (2.5*meta)
@@ -386,18 +372,18 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
 
 
     """FOOD == Calculate seasonal prey density based on temperature and phytoplankton"""
-    currentDate = grdSTATION.refDate + datetime.timedelta(seconds=julian)
-    if event!="ESM RUN":
-        Tanomaly = (Tdata - grdSTATION.aveT[int(currentDate.month-1)]) / (grdSTATION.aveT.max() - grdSTATION.aveT.min())
-    else:
-        Tanomaly = 0.0
+    #currentDate = grdSTATION.refDate + datetime.timedelta(seconds=julian)
+    #if event!="ESM RUN":
+    #    Tanomaly = (Tdata - grdSTATION.aveT[int(currentDate.month-1)]) / (grdSTATION.aveT.max() - grdSTATION.aveT.min())
+    #else:
+    Tanomaly = 0.0
 
-    if grdSTATION.seawifs is True:
-        if grdSTATION.relativeSeawifsValue > 0.01:
-            P = Tanomaly + grdSTATION.relativeSeawifsValue
-        else:
-            P = grdSTATION.relativeSeawifsValue
-        P = max(0.0,P)
+    #if grdSTATION.seawifs is True:
+    #    if grdSTATION.relativeSeawifsValue > 0.01:
+    #        P = Tanomaly + grdSTATION.relativeSeawifsValue
+    #    else:
+    #        P = grdSTATION.relativeSeawifsValue
+    #    P = max(0.0,P)
     if event=="ESM RUN":
         """Use large phytoplankton as proxy for zooplankton"""
         P=0.45 * NLGdata * 1.e4
@@ -425,20 +411,16 @@ def calculateGrowth(julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval
     hand[:] = 0.264*10**(7.0151*(prey_LENGTH[:]/Larval_mm)) # Walton 1992
     enc[:] = ((0.667*np.pi*(R[:]**3.)*f + np.pi*(R[:]**2.)*np.sqrt(prey_LENGTH[:]**2.+ 2.*omega**2.)*f*tau) * (prey_D[:]*((prey+1)*MultiplyPrey*P))* ltr2mm3)
 
-
-   # print "j: ",j, " enc:",enc[j]*dt*deltaH, " mm:",Larval_mm, "pca:",pca[j], "SPpl:",prey_D[j]
-  #  print "prey density: %s"%(sum(prey_D[:]*((prey+1)*MultiplyPrey*P)))
     """Calculate ingestion rate"""
     ing[:] = (dt*enc[:]*pca[:]*prey_WGT[:]*micro2m / (1 + hand[:]))*deltaH
 
-   # print "j:",j, "ing:",ing[j], "hour:",hour, "stomachfull:", (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size), "\n"
-    #for j in range(16):
-    #    print "ingestion %s: %s"%(j,ing[j])
-    #print "\n"
+    for j in xrange(16):
+        print "j:",j, " enc:",enc[j]*dt*deltaH, " mm:",Larval_mm, "pca:",pca[j], "SPpl:",prey_D[j]
+        print "j:",j, " ing:",ing[j], "visual:",R[j]
     """Calculate stomach fullness"""
     stomachFullness =  (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size)
-
-    return ing,GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness, MultiplyPrey*(prey+1)*P
+    
+    return ing,GR_gram,GR,meta,assi,stomachFullness
 
 def getMaxMinDepths(oldDepth,maxHourlyMove,grdSTATION):
     """The value you give deepstDepthAllowed will be the absolute deepest
@@ -729,6 +711,9 @@ def ibm(station,stationName,stationNumber,event):
                 for prey in xrange(Nprey):
 
                     for ind in xrange(Nlarva):
+                        if day==0:
+                            depth =initDepth * np.random.random_sample()
+                            print "initdepth is %s and depth is %s"%(initDepth,depth)
                         if loopsDone : break
                         """We create an array that controls the entrance and exit points in time for
                         a given larvae"""
@@ -797,12 +782,41 @@ def ibm(station,stationName,stationNumber,event):
                                     """Light level at current depth:"""
                                     Eb = surfaceLight*np.exp(attCoeff*(-depth))
                                     """Calculate growth and ingestion at the current depth:"""
+                                    
+                                    """==>INDEX calculations==============================="""
+                                    depthIndex1, depthIndex2, dz1, dz2 = getDepthIndex(grdSTATION,depth)
+    
+                                    if event != "ESM RUN":
+                                        Tdata,Sdata,Udata,Vdata,windX,windY = IOnetcdf.getData(julian,julianIndex,julianFileA,
+                                                                          julianFileB,dz1,dz2,depthIndex1,
+                                                                          depthIndex2,grdSTATION,event)
+                                    else:
+                                        Tdata,NSMdata,NLGdata,CHLAdata,windX,windY = IOnetcdf.getData(julian,julianIndex,julianFileA,
+                                                                          julianFileB,dz1,dz2,depthIndex1,
+                                                                          depthIndex2,grdSTATION,event)
+                                        grdSTATION.chlaValue=CHLAdata
 
-                                    ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness,Ndata = calculateGrowth(julian,Eb,deltaH,depth,h,grdSTATION,dt,
-                                                                                                               W[cohort,ind,larvaIndex-1,prey],
-                                                                                                               L[cohort,ind,larvaIndex-1,prey],julianIndex,
-                                                                                                               julianFileA,julianFileB,R,enc,hand,ing,pca,
-                                                                                                               S[cohort,ind,larvaIndex-1,prey],prey,event)
+                                    print "Calling calulateGrowth"
+                                    ing, GR_gram,GR,meta,assi,stomachFullness= calculateGrowth(Tdata,NLGdata,windX,windY,julian,Eb,deltaH,depth,h,grdSTATION,dt,
+                                                                                                W[cohort,ind,larvaIndex-1,prey],
+                                                                                                L[cohort,ind,larvaIndex-1,prey],R,enc,hand,ing,pca,
+                                                                                                S[cohort,ind,larvaIndex-1,prey],prey,event)
+                                    print "Calling bioenergetics.growth"
+                                    II=len(prey_LENGTH)
+                                    print Tdata,NLGdata,windX,windY
+                                    print S[cohort,ind,larvaIndex-1,prey],prey_AREA,prey_LENGTH
+                                    print prey_D,prey_WGT,L[cohort,ind,larvaIndex-1,prey],W[cohort,ind,larvaIndex-1,prey]
+                                    print sec2day, mg2ug,ltr2mm3, m2mm,mm2m
+                                    print f,tau,micro2m,Eb,contrast,Ke_larvae
+                                    print beamAttCoeff,deltaH,dt,II,depth,prey,gut_size
+                                    print "size",II
+                           
+                                    ing,GR_gram,GR,meta,assi,stomachFullness,zoop = bioenergetics.bioenergetics.growth(Tdata,NLGdata,windX,windY,
+                                                                                    S[cohort,ind,larvaIndex-1,prey],prey_AREA,prey_LENGTH,
+                                                                                    prey_D,prey_WGT,L[cohort,ind,larvaIndex-1,prey],W[cohort,ind,larvaIndex-1,prey],
+                                                                                    sec2day, mg2ug,ltr2mm3, m2mm,mm2m,f,tau,micro2m,Eb,contrast,Ke_larvae,
+                                                                                    beamAttCoeff,deltaH,dt,II,depth,prey,gut_size)
+                                    
 
                                     """Calculate mortality at the current depth layer"""
                                     mortality, didStarve, dead = predation.FishPredAndStarvation(grdSTATION,deltaH,FishDens,
@@ -916,14 +930,7 @@ def ibm(station,stationName,stationNumber,event):
             message='---> running IBMtime-step %s of %s with %s released cohorts (%s finished)'%(t,grdSTATION.refDate + datetime.timedelta(seconds=julian),releasedCohorts,minNumberOfActiveCohort)
             showProgress(t,Ntime,message)
 
-if __name__=="__main__":
-
-    try:
-        import psyco
-        psyco.log()
-        psyco.profile()
-    except ImportError:
-        pass
+def real_main():
 
     #events = ['COLD', 'WARM']
     #events = ['REGULAR RUN']
@@ -957,6 +964,8 @@ if __name__=="__main__":
                     "/Users/trond/Projects/ESM2/ESM-lofoten.nc",
                     "/Users/trond/Projects/ESM2/ESM-georges.nc"]
 
+        stations = ["/Users/trond/Projects/ESM2/ESM-northsea.nc"]
+
 
     """Notice that if you use seawifs data, the order of the stations here have to match
     The order of station seawifs data in seawifs file (see extractSeaWifs.py file)"""
@@ -981,3 +990,23 @@ if __name__=="__main__":
                 ibm(station, stationName, stationNumber, event)
 
             stationNumber+=1
+
+def profile_main():
+    # This is the main function for profiling
+    # We've renamed our original main() above to real_main()
+    import cProfile, pstats, StringIO, logging
+    prof = cProfile.Profile()
+    prof = prof.runctx("real_main()", globals(), locals())
+    stream = StringIO.StringIO()
+    stats = pstats.Stats(prof, stream=stream)
+    stats.sort_stats("time")  # Or cumulative
+    stats.print_stats(80)  # 80 = how many to print
+    # The rest is optional.
+    #stats.print_callees()
+    #stats.print_callers()
+    LOG_FILENAME = 'ibm_log.log'
+    if os.path.exists(LOG_FILENAME): os.remove(LOG_FILENAME)
+    logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO)
+    logging.info("Profile data:\n%s", stream.getvalue())
+    
+profile_main()

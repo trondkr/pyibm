@@ -75,8 +75,8 @@ Contains
     !
     !
                          
-!f2py intent(in,overwrite) c, C0, Ap, Vc, KE, EB
-!f2py intent(in,out,overwrite) r, IER
+!f2py intent(in,overwrite) c, C0, Ap, Vc, KE, EB, IER
+!f2py intent(in,out,overwrite) r
 
     !
     !
