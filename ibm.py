@@ -23,14 +23,16 @@ import grd
 import IOverticalGrid
 import IOtime
 import IOnetcdf
-import predation
 from initLarva import *
 """Import f2py Fortran modules"""
 import calclight
 import perception
 import bioenergetics
+import predF90
 import IOstation
 from memoize import memoize
+import IOdata
+import Behavior
 
 __author__   = 'Trond Kristiansen'
 __email__    = 'trond.kristiansen@imr.no'
@@ -131,9 +133,9 @@ def init(station,stationName,event):
         endDate   = datetime.datetime(1948,12,14,0,0,0)
 
     if event == "ESM RUN":
-        varlist=['temp','salt','nlg','nsm','chla','taux','tauy'] #,'nanophytoplankton','diatom','mesozooplankton','microzooplankton','Pzooplankton']
-        startDate = datetime.datetime(2002,4,15,1,0,0)
-        endDate   = datetime.datetime(2002,8,14,0,0,0)
+        varlist=['temp','salt','nh4sm','nh4lg','no3sm','no3lg','chla','taux','tauy']
+        startDate = datetime.datetime(2002,1,15,1,0,0)
+        endDate   = datetime.datetime(2003,1,15,1,0,0)
         grdSTATION.chlaValue=0.0
 
     if event == 'COLD' or event=='WARM':
@@ -253,22 +255,22 @@ def isAlive(julian,larvaAge,cohort,isDead):
 @memoize
 def getDepthIndex(grdSTATION,depth):
     depthFOUND=False; d=0
-    
+
     while d < len(grdSTATION.depth) and depthFOUND==False:
 
-        if abs(grdSTATION.depth[d]) <= abs(depth) <= abs(grdSTATION.depth[d+1]) and depthFOUND==False:
-            dz1=1.0-abs((abs(grdSTATION.depth[d])-abs(depth))/(abs(grdSTATION.depth[d])-abs(grdSTATION.depth[d+1])))
-            dz2=1.0-abs((abs(grdSTATION.depth[d+1])-abs(depth))/(abs(grdSTATION.depth[d])-abs(grdSTATION.depth[d+1])))
+        if np.abs(grdSTATION.depth[d]) <= np.abs(depth) <= np.abs(grdSTATION.depth[d+1]) and depthFOUND==False:
+            dz1=1.0-np.abs((np.abs(grdSTATION.depth[d])-np.abs(depth))/(np.abs(grdSTATION.depth[d])-np.abs(grdSTATION.depth[d+1])))
+            dz2=1.0-np.abs((np.abs(grdSTATION.depth[d+1])-np.abs(depth))/(np.abs(grdSTATION.depth[d])-np.abs(grdSTATION.depth[d+1])))
             depthIndex1=d; depthIndex2=d+1
             depthFOUND=True
             #print 'depth 1:',grdSTATION.depth[d], depth, grdSTATION.depth[d+1],depthIndex1, depthIndex2
 
-        elif abs(grdSTATION.depth[0]) > abs(depth) and depthFOUND==False:
+        elif np.abs(grdSTATION.depth[0]) > np.abs(depth) and depthFOUND==False:
             depthIndex1=0; depthIndex2=0; dz1=0.5; dz2=0.5
             depthFOUND=True
             #print 'depth 2:',grdSTATION.depth[d], depth,depthIndex1, depthIndex2
 
-        elif abs(grdSTATION.depth[-1]) < abs(depth) and depthFOUND==False:
+        elif np.abs(grdSTATION.depth[-1]) < np.abs(depth) and depthFOUND==False:
             depthIndex1=-1; depthIndex2=-1; dz1=0.5; dz2=0.5
             depthFOUND=True
             #print 'depth 3:',grdSTATION.depth[-1], depth,depthIndex1, depthIndex2
@@ -311,7 +313,7 @@ def initBehavior(depth,maxHourlyMove,grdSTATION):
             if newDepth < h_start: newDepth=h_start
             if newDepth not in sampleDepths:
                 sampleDepths.append(newDepth)
-                if abs(newDepth-oldDepth) > maxDiff: maxDiff=abs(newDepth-oldDepth)
+                if np.abs(newDepth-oldDepth) > maxDiff: maxDiff=np.abs(newDepth-oldDepth)
 
     #for j in range(len(sampleDepths)):
     #  print "depth %3.3f diffZ %3.3f"%(sampleDepths[j], abs(oldDepth-sampleDepths[j]))
@@ -319,27 +321,7 @@ def initBehavior(depth,maxHourlyMove,grdSTATION):
 
     return oldDepth,optDepth,sampleDepths,maxDiff,fitness
 
-def getBehavior(stomachFullness,F,m,length,oldFitness,depth,optDepth):
-    """Rule 4 of Behavioral Ecology paper - Kristiansen et al. 2009"""
-    T=min(0.9,0.3+1000.0*(1+(length)*np.exp(length))**(-1))
-
-    #print "behavior ", T, length, 0.3+1000.0*(1+(length)*np.exp(length))**(-1), length
-    if stomachFullness > T:
-        beta   = 7.0
-        vector = ((stomachFullness-T)/(1.0-T))**beta
-    else: vector=0.0
-
-    fitness=(((1-vector)*F) - vector*m)
-
-    #print "Vector %s optdepth %s vs old depth %s : new fit %s and old %s "%(vector,optDepth,depth,fitness,oldFitness)
-    if fitness > oldFitness:
-     #   print "Change: Vector %s new depth %s vs old depth %s : new fit %s and old %s "%(vector,optDepth,depth,fitness,oldFitness)
-        optDepth=depth
-        oldFitness=fitness
-
-    return optDepth,oldFitness
-
-
+@memoize
 def calculateLength(Larval_wgt, Larval_m):
     oldLarval_m = Larval_m
     Larval_m = np.exp(2.296 + 0.277*np.log(Larval_wgt) - 0.005128*np.log(Larval_wgt)**2)
@@ -351,6 +333,11 @@ def calculateLength(Larval_wgt, Larval_m):
 
 def calculateGrowth(Tdata,NLGdata,windX,windY,julian,Eb,deltaH,depth,hour,grdSTATION,dt,Larval_wgt, Larval_mm,
                     R,enc,hand,ing,pca,Spre,prey,event):
+    # FUNCTION IS DEPRECATED: USE BIOENERGETICS.F90
+    # Used to be called using:  ing, GR_gram,GR,meta,assi,stomachFullness= calculateGrowth(Tdata,NLGdata,windX,windY,julian,Eb,deltaH,depth,h,grdSTATION,dt,
+    #                                                                W[cohort,ind,larvaIndex-1,prey],
+    #                                                                L[cohort,ind,larvaIndex-1,prey],R,enc,hand,ing,pca,
+    #                                                                S[cohort,ind,larvaIndex-1,prey],prey,event)
 
     """Mouthsize of larvae. The larvae can only capture calanus of sizes less
     than the larval mouthsize. Folkvord et al."""
@@ -398,9 +385,6 @@ def calculateGrowth(Tdata,NLGdata,windX,windY,julian,Eb,deltaH,depth,hour,grdSTA
         """All input to getr is either in m (or per m), or in mm (or per mm)"""
         R[j], IER = perception.perception.getr(R[j],beamAttCoeff/m2mm,contrast,prey_AREA[j],Em,Ke_larvae,Eb, IER)
         pca[j] = max(0.0,min(1.0,-16.7*(prey_LENGTH[j]/Larval_mm) + 3.0/2.0))
-        """If you don't have fortran compiler use python routine for visual range"""
-        #visual = np.sqrt(Em*contrast*(Ap_calanus*m2mm)*(Eb/(Ke_larvae+Eb)))
-        #R[j] = (IOlight.getPerceptionDistance(Em,attCoeff,Ke_larvae,Ap_calanus,Eb))*m2mm
 
     """Calculate turbulence based on wind stress"""
     epsilon=(5.82*1.E-9*((np.sqrt(windX**2 + windY**2)))**3.)/(depth+0.1)
@@ -414,14 +398,15 @@ def calculateGrowth(Tdata,NLGdata,windX,windY,julian,Eb,deltaH,depth,hour,grdSTA
     """Calculate ingestion rate"""
     ing[:] = (dt*enc[:]*pca[:]*prey_WGT[:]*micro2m / (1 + hand[:]))*deltaH
 
-    for j in xrange(16):
-        print "j:",j, " enc:",enc[j]*dt*deltaH, " mm:",Larval_mm, "pca:",pca[j], "SPpl:",prey_D[j]
-        print "j:",j, " ing:",ing[j], "visual:",R[j]
+    #for j in xrange(16):
+      #  print "j:",j, " enc:",enc[j]*dt*deltaH, " mm:",Larval_mm, "pca:",pca[j], "SPpl:",prey_D[j]
+    #    print "j:",j, " ing:",ing[j], "enc:",enc[j]
     """Calculate stomach fullness"""
     stomachFullness =  (min(gut_size*Larval_wgt,Spre + sum(ing)))/(Larval_wgt*gut_size)
-    
+
     return ing,GR_gram,GR,meta,assi,stomachFullness
 
+@memoize
 def getMaxMinDepths(oldDepth,maxHourlyMove,grdSTATION):
     """The value you give deepstDepthAllowed will be the absolute deepest
     depth the larvae will move to. Useful to set this depth equal to bottom.
@@ -651,7 +636,7 @@ def ibm(station,stationName,stationNumber,event):
     releasedCohorts=0
     released=[]
     for i in xrange(Ncohorts):  released.append(0)
-   
+
     for i in xrange(Ncohorts): isDead.append(False)
 
     """==================LOOP STARTS====================="""
@@ -677,37 +662,37 @@ def ibm(station,stationName,stationNumber,event):
         """loop over all the cohorts of interest"""
         noOneLeft=True
         currentCohort=0
-        
+
         for cohort in xrange(minNumberOfActiveCohort,releasedCohorts+1):
-           
+
             """For each day, and cohort, loop over all the individuals"""
             if cohort >= len(grdSTATION.listOfReleaseDates):
                 continue
             else:
                 a,b,c= checkReleased(grdSTATION.listOfReleaseDates[cohort],julian,grdSTATION)
-                release.append(a); isReleased.append(b); releaseDate.append(c); 
-                
+                release.append(a); isReleased.append(b); releaseDate.append(c);
+
                 if release[currentCohort] is True:
                #     print "\nReleasing a new cohort on %s"%(releaseDate[currentCohort])
                     released[cohort]=t
                     isReleased[currentCohort]=True
-                   
+
                     releasedCohorts+=1
                     noOneLeft=False
-                
+
                 currentCohort+=1
-            
+
    #     print "We have found %s cohorts that have been released"%(releasedCohorts)
-       
+
         currentCohort=0
         for cohort in xrange(minNumberOfActiveCohort,releasedCohorts):
             #print "Checking # %s : cohorts from %s to %s : currentCohort %s"%(cohort,minNumberOfActiveCohort,releasedCohorts,currentCohort)
-          
+
             if isReleased[currentCohort] is False:
                 continue
             elif released[cohort]!=0:
                 minNumberOfActiveCohort = findActiveCohorts(isDead,isReleased)
-        
+
                 for prey in xrange(Nprey):
 
                     for ind in xrange(Nlarva):
@@ -777,51 +762,50 @@ def ibm(station,stationName,stationNumber,event):
                                 """OPTIMAL DEPTH == Find the optimal depth to stay at given ratio of ingestion and mortality rate"""
                                 for depth in sampleDepths:
 
-                                    diffZ=abs(oldDepth - depth)
+                                    diffZ=np.abs(oldDepth - depth)
 
                                     """Light level at current depth:"""
                                     Eb = surfaceLight*np.exp(attCoeff*(-depth))
                                     """Calculate growth and ingestion at the current depth:"""
-                                    
+
                                     """==>INDEX calculations==============================="""
                                     depthIndex1, depthIndex2, dz1, dz2 = getDepthIndex(grdSTATION,depth)
-    
-                                    if event != "ESM RUN":
-                                        Tdata,Sdata,Udata,Vdata,windX,windY = IOnetcdf.getData(julian,julianIndex,julianFileA,
-                                                                          julianFileB,dz1,dz2,depthIndex1,
-                                                                          depthIndex2,grdSTATION,event)
-                                    else:
-                                        Tdata,NSMdata,NLGdata,CHLAdata,windX,windY = IOnetcdf.getData(julian,julianIndex,julianFileA,
-                                                                          julianFileB,dz1,dz2,depthIndex1,
-                                                                          depthIndex2,grdSTATION,event)
-                                        grdSTATION.chlaValue=CHLAdata
+                                    Tdata=0.0;Sdata=0.0;NH4SMdata=0.0;NH4LGdata=0.0;NO3SMdata=0.0;NO3LGdata=0.0;CHLAdata=0.0;windX=0.0;windY=0.0
 
-                                    print "Calling calulateGrowth"
-                                    ing, GR_gram,GR,meta,assi,stomachFullness= calculateGrowth(Tdata,NLGdata,windX,windY,julian,Eb,deltaH,depth,h,grdSTATION,dt,
-                                                                                                W[cohort,ind,larvaIndex-1,prey],
-                                                                                                L[cohort,ind,larvaIndex-1,prey],R,enc,hand,ing,pca,
-                                                                                                S[cohort,ind,larvaIndex-1,prey],prey,event)
-                                    print "Calling bioenergetics.growth"
+                                    Tdata,Sdata,NH4SMdata,NH4LGdata,NO3SMdata,NO3LGdata,CHLAdata,windX,windY=IOdata.io.getdata(Tdata,Sdata,NH4SMdata,
+                                                                                            NH4LGdata,NO3SMdata,NO3LGdata,CHLAdata,windX,
+                                                                                            windY,julian,julianIndex+1,julianFileA+1,
+                                                                                            julianFileB+1,dz1,dz2,depthIndex1+1,depthIndex2+1,
+                                                                                            np.asarray(grdSTATION.data, order='Fortran'),
+                                                                                            np.asarray(grdSTATION.dataXY, order='Fortran'),event,
+                                                                                            len(grdSTATION.data[:,0,0]),len(grdSTATION.data[0,:,0]),
+                                                                                            len(grdSTATION.data[0,0,:]),len(grdSTATION.dataXY[0,:]))
+                                    #TODO: The chlorophyll is now taken from current depth.
+                                    # Should be from surface or integrated value sicne this affects attenuation coeff?
+                                    grdSTATION.chlaValue=CHLAdata
+
                                     II=len(prey_LENGTH)
-                                    print Tdata,NLGdata,windX,windY
-                                    print S[cohort,ind,larvaIndex-1,prey],prey_AREA,prey_LENGTH
-                                    print prey_D,prey_WGT,L[cohort,ind,larvaIndex-1,prey],W[cohort,ind,larvaIndex-1,prey]
-                                    print sec2day, mg2ug,ltr2mm3, m2mm,mm2m
-                                    print f,tau,micro2m,Eb,contrast,Ke_larvae
-                                    print beamAttCoeff,deltaH,dt,II,depth,prey,gut_size
-                                    print "size",II
-                           
-                                    ing,GR_gram,GR,meta,assi,stomachFullness,zoop = bioenergetics.bioenergetics.growth(Tdata,NLGdata,windX,windY,
+
+                                    suming=0.0; ing[:]=0; GR_gram=0.0; GR=0.0; meta=0.0; assi=0.0; stomachFullness=0.0; zoop=0.0
+
+                                    suming,ing,GR_gram,GR,meta,assi,stomachFullness,zoop = bioenergetics.bioenergetics.growth(suming,ing,GR_gram,GR,meta,assi,stomachFullness,zoop,
+                                                                                    Tdata,NH4SMdata,NH4LGdata,NO3SMdata,NO3LGdata,windX,windY,
                                                                                     S[cohort,ind,larvaIndex-1,prey],prey_AREA,prey_LENGTH,
                                                                                     prey_D,prey_WGT,L[cohort,ind,larvaIndex-1,prey],W[cohort,ind,larvaIndex-1,prey],
                                                                                     sec2day, mg2ug,ltr2mm3, m2mm,mm2m,f,tau,micro2m,Eb,contrast,Ke_larvae,
-                                                                                    beamAttCoeff,deltaH,dt,II,depth,prey,gut_size)
-                                    
+                                                                                    beamAttCoeff,MultiplyPrey,deltaH,dt,depth,prey,gut_size,II)
+
 
                                     """Calculate mortality at the current depth layer"""
-                                    mortality, didStarve, dead = predation.FishPredAndStarvation(grdSTATION,deltaH,FishDens,
-                                                                                                 L[cohort,ind,larvaIndex-1,prey]*mm2m,W[cohort,ind,larvaIndex-1,prey],
-                                                                                                 attCoeff,Eb,dt,ing,stomachFullness)
+                                    Mortality=0.0; Starved=0.0
+                                    mortality, didStarve = predF90.predation.fishpredandstarvation(Mortality,Starved,FishDens,L[cohort,ind,larvaIndex-1,prey]*mm2m,
+                                                                                                        W[cohort,ind,larvaIndex-1,prey],
+                                                                                                        Eb,suming,stomachFullness,beamAttCoeff,m2mm,
+                                                                                                        Ke_predator,deadThreshold,deltaH,dt)
+
+
+
+
 
                                     """Calculate the cost of being active. The more you swim the more you use energy in raltive ratio to
                                     routine metabolims. Trond Kristiansen, 23.03.2010"""
@@ -829,27 +813,33 @@ def ibm(station,stationName,stationNumber,event):
 
 
                                     """Calculate fitness at the current depth layer"""
-                                    F = (sum(ing)-activityCost)/W[cohort,ind,larvaIndex-1,prey]
+                                    F = (suming-activityCost)/W[cohort,ind,larvaIndex-1,prey]
 
-
-                                    optDepth,oldFitness = getBehavior(stomachFullness,
+                                    optDepth,oldFitness = Behavior.behavior.getbehavior(stomachFullness,
                                                                  F,mortality,L[cohort,ind,larvaIndex-1,prey],
-                                                                 oldFitness,depth,optDepth)
+                                                                 depth,optDepth,oldFitness)
 
                                 """Set the optimal depth equal to result of optimal loop and update light at depth"""
-                                diffZ=abs(depth-optDepth)
+                                diffZ=np.abs(depth-optDepth)
                                 depth=optDepth
 
                                 Eb = surfaceLight*np.exp(attCoeff*(-depth))
                                 """Now recalculate the growth and mortality at the optimal depth layer"""
-                                ing, GR_gram,GR,meta,assi,Tdata,Eb,stomachFullness,Ndata = calculateGrowth(julian,Eb,deltaH,depth,h,grdSTATION,dt,W[cohort,ind,larvaIndex-1,prey],
-                                                                                                     L[cohort,ind,larvaIndex-1,prey],julianIndex,
-                                                                                                     julianFileA,julianFileB,R,enc,hand,ing,pca,
-                                                                                                     S[cohort,ind,larvaIndex-1,prey],prey,event)
 
-                                mortality, didStarve, dead = predation.FishPredAndStarvation(grdSTATION,deltaH,FishDens,L[cohort,ind,larvaIndex-1,prey]*mm2m,
-                                                                                       W[cohort,ind,larvaIndex-1,prey],attCoeff,
-                                                                                       Eb,dt,ing,stomachFullness)
+                                suming=0.0; ing[:]=0; GR_gram=0.0; GR=0.0; meta=0.0; assi=0.0; stomachFullness=0.0; zoop=0.0
+
+                                suming,ing,GR_gram,GR,meta,assi,stomachFullness,zoop = bioenergetics.bioenergetics.growth(suming,ing,GR_gram,GR,meta,assi,stomachFullness,zoop,
+                                                                                    Tdata,NH4SMdata,NH4LGdata,NO3SMdata,NO3LGdata,windX,windY,
+                                                                                    S[cohort,ind,larvaIndex-1,prey],prey_AREA,prey_LENGTH,
+                                                                                    prey_D,prey_WGT,L[cohort,ind,larvaIndex-1,prey],W[cohort,ind,larvaIndex-1,prey],
+                                                                                    sec2day, mg2ug,ltr2mm3, m2mm,mm2m,f,tau,micro2m,Eb,contrast,Ke_larvae,
+                                                                                    beamAttCoeff,MultiplyPrey,deltaH,dt,depth,prey,gut_size,II)
+
+                                Mortality=0.0; Starved=0.0
+                                mortality, didStarve = predF90.predation.fishpredandstarvation(Mortality,Starved,FishDens,L[cohort,ind,larvaIndex-1,prey]*mm2m,
+                                                                                                W[cohort,ind,larvaIndex-1,prey],
+                                                                                                Eb,suming,stomachFullness,beamAttCoeff,m2mm,
+                                                                                                Ke_predator,deadThreshold,deltaH,dt)
 
                                 """Calculate the cost of the activity performed during last hour for vertical behavior"""
                                 activityCost= (diffZ/maxDiffZ)*(meta*costRateOfMetabolism)
@@ -865,7 +855,7 @@ def ibm(station,stationName,stationNumber,event):
                                 W_AF[cohort,ind,larvaIndex,prey] = W_AF[cohort,ind,larvaIndex-1,prey] + (np.exp(GR)-1)*W_AF[cohort,ind,larvaIndex-1,prey]
                                 larvaTdata[cohort,ind,larvaIndex,prey] = Tdata
                                 larvaDepth[cohort,ind,larvaIndex,prey] = depth
-                                larvaNauplii[cohort,ind,larvaIndex,prey] = Ndata
+                                larvaNauplii[cohort,ind,larvaIndex,prey] = zoop
 
                                 if didStarve > 1: larvaPsur[cohort,ind,larvaIndex,prey]=0.0
                                 else:larvaPsur[cohort,ind,larvaIndex,prey]=larvaPsur[cohort,ind,larvaIndex-1,prey]*(np.exp(-mortality))
@@ -959,18 +949,18 @@ def real_main():
         """ ESM run--------------------"""
 
         """These input files were generated using ESM2/organizeESMdata.py"""
-        stations = ["/Users/trond/Projects/ESM2/ESM-northsea.nc",
-                    "/Users/trond/Projects/ESM2/ESM-iceland.nc",
-                    "/Users/trond/Projects/ESM2/ESM-lofoten.nc",
-                    "/Users/trond/Projects/ESM2/ESM-georges.nc"]
+        stations = ["/Users/trond/Projects/ESM2/ESM_2001_2100_northsea.nc",
+                    "/Users/trond/Projects/ESM2/ESM_2001_2100_iceland.nc",
+                    "/Users/trond/Projects/ESM2/ESM_2001_2100_lofoten.nc",
+                    "/Users/trond/Projects/ESM2/ESM_2001_2100_georges.nc"]
 
-        stations = ["/Users/trond/Projects/ESM2/ESM-northsea.nc"]
+        stations = ["/Users/trond/Projects/ESM2/ESM_2001_2100_northsea.nc"]
 
 
     """Notice that if you use seawifs data, the order of the stations here have to match
     The order of station seawifs data in seawifs file (see extractSeaWifs.py file)"""
     stationNames=['North Sea', 'Iceland','Lofoten', 'Georges Bank']
- 
+
 
     stationNumber=0
 
@@ -1008,5 +998,5 @@ def profile_main():
     if os.path.exists(LOG_FILENAME): os.remove(LOG_FILENAME)
     logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO)
     logging.info("Profile data:\n%s", stream.getvalue())
-    
+
 profile_main()

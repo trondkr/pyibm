@@ -19,13 +19,13 @@ Variables that are imported to ibm.py using from initLarva import *
 """Number of release dates and cohorts. This will be lowered if NReleaseDatesInit*daysBetweenReleases is
 more than total number of simulation days : see function init in ibm.py"""
 NReleaseDatesInit=9500
-daysBetweenReleases=14
-Nlarva=3
-NDaysAlive=15
+daysBetweenReleases=7
+Nlarva=1
+NDaysAlive=30
 Nprey=1
 initWgt=0.09 #wgt in milligrams
 initDepth=25 # Larvae are randomly distributed in range 0-initDepth
-randomWgt=0 #1=on, 0=off Initialize weight with random values from initWgt
+randomWgt=1 #1=on, 0=off Initialize weight with random values from initWgt
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
 MultiplyPrey=85
 
@@ -73,7 +73,7 @@ Here we divide the prey size spectra into 16 groups ranging from 0.1 to 1.6 mm i
 The width and weight of the prey were derived from the weight and width of Calanus
 of equal length. Calculations according to Daewel require length in microgram (converted to
 mm at the end for use in ibm)."""
-sizeMin=100. # micrograms (/1000 to get mm)
+sizeMin=100. # micromm (/1000 to get mm)
 sizeMax=1600.
 prey_LENGTH=[]
 """Calculate the sizes based on a range of 16 from 100 to 1600 micrograms"""
@@ -98,7 +98,7 @@ for i in range(16):
 prey_WGT   = [0.1, 0.25, 0.45, 1.0, 1.51, 2.76, 3.76, 6.0, 9.0, 13.24, 15.0, 17.0, 19.0, 23.13, 30.0, 45.0]
 prey_WIDTH = [0.08, 0.1, 0.1, 0.1, 0.15, 0.17, 0.18, 0.2, 0.22, 0.25, 0.31, 0.35, 0.38, 0.38, 0.39, 0.40]
 
-prey_LENGTH= np.asarray(prey_LENGTH)/1000. #microgram to mm
+prey_LENGTH= np.asarray(prey_LENGTH)/1000. #micromm to mm
 prey_D=np.asarray(SPpl)
 
 prey_AREA=np.zeros(len(prey_LENGTH))
