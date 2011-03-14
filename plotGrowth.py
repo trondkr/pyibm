@@ -19,15 +19,9 @@ __status__   = "Development, modified 9.9.2009, 18.02.2010, 2.3.2010, 9.6.2010"
 
 missingValue=-9.99e-35
 
-stationsCold=["results/IBM_1977_station_Lofoten.nc",
-              "results/IBM_1963_station_NorthSea.nc",
-              "results/IBM_1983_station_Iceland.nc",
-              "results/IBM_1965_station_GeorgesBank.nc"]
+stationsCold=["results/IBM_1980_station_Lofoten.nc"]
 
-stationsWarm=["results/IBM_1990_station_Lofoten.nc",
-              "results/IBM_1999_station_NorthSea.nc",
-              "results/IBM_1960_station_Iceland.nc",
-              "results/IBM_1999_station_GeorgesBank.nc"]
+stationsWarm=["results/IBM_1990_station_Lofoten.nc"]
 
 latList=[67.5001, 54.5601, 63.7010,   41.6423]    
 stationNames=["Lofoten","North Sea","Iceland","Georges Bank"]
@@ -118,7 +112,7 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
                 lat=latList[stations]
                 radfl0,radmax,cawdir = calclight.calclight.qsw(radfl0,radmax,cawdir,clouds, lat*np.pi/180.0,int(tt[7])*1.0,365)
                 radmax = radmax/0.217 # From W/m2 to umol/m2/s-1
-                
+             
                 """Now calculate the total irradiance and daylength for given day"""
                 daylen=0.0; totIrradiance = 0.
                 diffAtt=0.18
@@ -188,7 +182,7 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
     plotfile="results/sgr_"+str(stationNames[stations])+".pdf"
     plt.savefig(plotfile)
     print "Saving to file: %s"%(plotfile)
-    
+    show()
     stations+=1
     clf()
 stName+=1

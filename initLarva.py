@@ -22,12 +22,11 @@ NReleaseDatesInit=9500
 daysBetweenReleases=7
 Nlarva=1
 NDaysAlive=30
-Nprey=1
-initWgt=0.09 #wgt in milligrams
+initWgt=0.09 #wgt in milligrams (mg)
 initDepth=25 # Larvae are randomly distributed in range 0-initDepth
 randomWgt=1 #1=on, 0=off Initialize weight with random values from initWgt
 # Number of nauplii per liter is a function of Nprey time MultiplyPrey: e.g. prey=2*MultiplyPrey
-MultiplyPrey=85
+MultiplyPrey=1.0     #85 for cold warm paper
 
 missingValue=-9.99e-35
 dt      = 3600
@@ -41,7 +40,7 @@ pi    = np.pi
 mm2m  = 0.001
 m2mm  = 1000.
 ltr2mm3 = 1e-6
-micro2m = 0.001
+ug2mg = 0.001
 contrast = 0.3 #Inherent contrast after Fiksen,02
 mm2m = 0.001
 mg2ug=1000.0
@@ -94,7 +93,7 @@ for i in range(16):
 """Here we calulate the percent of each size group represented as a biomass percent"""
 for i in range(16):
     SPpl[i] = (SDpl[i] * m[i])/tm
-
+"""Prey weight in ug"""
 prey_WGT   = [0.1, 0.25, 0.45, 1.0, 1.51, 2.76, 3.76, 6.0, 9.0, 13.24, 15.0, 17.0, 19.0, 23.13, 30.0, 45.0]
 prey_WIDTH = [0.08, 0.1, 0.1, 0.1, 0.15, 0.17, 0.18, 0.2, 0.22, 0.25, 0.31, 0.35, 0.38, 0.38, 0.39, 0.40]
 

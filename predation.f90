@@ -8,12 +8,10 @@ Module predation
   ! ---------------------------------------------------------------
   !
   ! USAGE:
-  !  suming,ing,GR_gram,GR,meta,assi,stomachFullness,zoop = bioenergetics.bioenergetics.growth(suming,ing,GR_gram,GR,meta,assi,stomachFullness,zoop,
-  !                                                                                  Tdata,NLGdata,windX,windY,
-  !                                                                                  S[cohort,ind,larvaIndex-1,prey],prey_AREA,prey_LENGTH,
-  !                                                                                  prey_D,prey_WGT,L[cohort,ind,larvaIndex-1,prey],W[cohort,ind,larvaIndex-1,prey],
-  !                                                                                  sec2day, mg2ug,ltr2mm3, m2mm,mm2m,f,tau,micro2m,Eb,contrast,Ke_larvae,
-  !                                                                                  beamAttCoeff,MultiplyPrey,deltaH,dt,depth,prey,gut_size,II)
+  ! mortality, didStarve = predF90.predation.fishpredandstarvation(Mortality,Starved,FishDens,L[cohort,ind,larvaIndex-1]*mm2m,
+  !                                                                                              W[cohort,ind,larvaIndex-1],
+  !                                                                                              Eb,suming,stomachFullness,beamAttCoeff,m2mm,
+  !                                                                                              Ke_predator,deadThreshold,deltaH,dt)
   ! ---------------------------------------------------------------------------------------------------------------------------------------------------
 
   Implicit None

@@ -3,7 +3,7 @@
 def memoize(function):
     cache = {}
     def decorated_function(*args):
-        
+
         if args in cache:
             return cache[args]
         else:

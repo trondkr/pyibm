@@ -19,8 +19,8 @@ Module perception
 
   Implicit None
   !
-  
-  ! f2py --verbose --fcompiler=intelem -c -m perception perception.f90        
+
+  ! f2py --verbose --fcompiler=intelem -c -m perception perception.f90 --f90flags="-no-heap-arrays"
 Contains
   !
   Subroutine getr (r, c, C0, Ap, Vc, KE, EB, IER)
@@ -47,7 +47,7 @@ Contains
     !	  Utne (1997) Sarsia 83:137-147.
     !
     !	  Programmed and tested 29.01.01 Dag L Aksnes
-    
+
     Implicit None
 
     Real r, c, C0, Vc, Ap, KE, EB
@@ -74,7 +74,7 @@ Contains
     !				= 0, valid r returned
     !
     !
-                         
+
 !f2py intent(in,overwrite) c, C0, Ap, Vc, KE, EB, IER
 !f2py intent(in,out,overwrite) r
 

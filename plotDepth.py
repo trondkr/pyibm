@@ -14,17 +14,10 @@ __status__   = "Development, modified 9.9.2009, 18.02.2010"
 
 missingValue=-9.99e-35
 
-stationsCold=["results/IBM_1977_station_Lofoten.nc",
-              "results/IBM_1963_station_NorthSea.nc",
-              "results/IBM_1983_station_Iceland.nc",
-              "results/IBM_1965_station_GeorgesBank.nc"]
+stationsCold=["results/IBM_2002_ESM_2001_2100_northsea.nc"]
+stationsWarm=["results/IBM_2002_ESM_2001_2100_northsea.nc"]
 
-stationsWarm=["results/IBM_1990_station_Lofoten.nc",
-              "results/IBM_1999_station_NorthSea.nc",
-              "results/IBM_1960_station_Iceland.nc",
-              "results/IBM_1999_station_GeorgesBank.nc"]
-
-stationNames=["Lofoten","North Sea","Iceland","Georges Bank"]
+stationNames=["North Sea"]
 
 co=["blue","red"]
 years=['Cold','Warm']
@@ -48,11 +41,11 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
     for station in st:
         cdf=Dataset(station,"r")
          
-        depth =cdf.variables["depth"][:,:,:,:]
+        depth =cdf.variables["depth"][:,:,:]
         time  =cdf.variables["time"][:]
         timeIndex=cdf.variables["timeIndex"][:,:,:]
         
-        refDate=datetime.datetime(1948,1,1,0,0,0)
+        refDate=datetime.datetime(2001,1,1,0,0,0)
         time2=[]
         for t in range(len(time)):
             if time[t]<1000000:
@@ -60,12 +53,12 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
         print "Start time %s and end time %s"%(time2[0],time2[-1])
         maxInd=len(time2)
         
-        sgr      =cdf.variables["sgr"][:,:,:,:]
-        wgt      =cdf.variables["wgt"][:,:,:,:]
+        sgr      =cdf.variables["sgr"][:,:,:]
+        wgt      =cdf.variables["wgt"][:,:,:]
         deltaH   =cdf.variables["deltaH"][:]
         #print 'Manually set the number of cohorts: line 71'
-        Ncohorts=len(depth[:,0,0,0]) -1
-        Nindividuals=len(depth[0,:,0,0])
+        Ncohorts=len(depth[:,0,0]) -1
+        Nindividuals=len(depth[0,:,0])
         print "Number of individuals %s and cohorts %s"%(Nindividuals, Ncohorts)
         for cohort in range(Ncohorts):
             index1=int(timeIndex[cohort,0,0])+1
@@ -95,14 +88,14 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
                 k2=(index1+(i+1)*24./float(deltaH)) -1
                 
                 for j in range(Nindividuals):
-                    meanIndDEPTH24H[j,i]=(mean(depth[cohort,j,k1:k2,prey]))
+                    meanIndDEPTH24H[j,i]=(mean(depth[cohort,j,k1:k2]))
                     for kkk in range(int(k2-k1)):
                         index=int(k1+kkk)
-                        if depth[cohort,j,index,prey] > maximum:
-                            maximum = depth[cohort,j,index,prey] 
+                        if depth[cohort,j,index] > maximum:
+                            maximum = depth[cohort,j,index] 
                             rangeDEPTH24H[i,0]=maximum
-                        if depth[cohort,j,index,prey] < minimum:
-                            minimum = depth[cohort,j,index,prey] 
+                        if depth[cohort,j,index] < minimum:
+                            minimum = depth[cohort,j,index] 
                             rangeDEPTH24H[i,0]=minimum
                             
                 minimum=99999
@@ -146,7 +139,7 @@ for stationCold, stationWarm in zip(stationsCold,stationsWarm):
     stations+=1
 
 plotfile="results/All_stations_depth.png"
-plt.savefig(plotfile)
+#plt.savefig(plotfile)
 print "Saving to file: %s"%(plotfile)
 stName+=1
 

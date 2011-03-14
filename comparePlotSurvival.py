@@ -14,15 +14,15 @@ __status__   = "Development, modified 9.9.2009, 18.02.2010"
 
 missingValue=-9.99e-35
 
-stationsCold=["results/IBM_1977_station_Lofoten.nc",
-              "results/IBM_1965_station_GeorgesBank.nc",
-              "results/IBM_1963_station_NorthSea.nc",
-              "results/IBM_1983_station_Iceland.nc"]
+stationsCold=["results/resultsPLoS/IBM_1977_station_Lofoten.nc",
+              "results/resultsPLoS/IBM_1965_station_GeorgesBank.nc",
+              "results/resultsPLoS/IBM_1963_station_NorthSea.nc",
+              "results/resultsPLoS/IBM_1983_station_Iceland.nc"]
 
-stationsWarm=["results/IBM_1990_station_Lofoten.nc",
-              "results/IBM_1999_station_GeorgesBank.nc",
-              "results/IBM_1999_station_NorthSea.nc",
-              "results/IBM_1960_station_Iceland.nc"]
+stationsWarm=["results/resultsPLoS/IBM_1990_station_Lofoten.nc",
+              "results/resultsPLoS/IBM_1999_station_GeorgesBank.nc",
+              "results/resultsPLoS/IBM_1999_station_NorthSea.nc",
+              "results/resultsPLoS/IBM_1960_station_Iceland.nc"]
 
 stationNames=["Lofoten","Georges Bank","North Sea","Iceland"]
 

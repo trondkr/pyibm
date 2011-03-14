@@ -17,7 +17,6 @@ def writeStationFile(deltaH,deltaZ,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larva
      f1.createDimension('cohort',grdSTATION.Ncohorts)
      f1.createDimension('larva', grdSTATION.Nlarva)
      f1.createDimension('time', None)
-     f1.createDimension('prey', grdSTATION.Nprey)
      f1.createDimension('larvaTime', Tlarva)
      f1.createDimension('IO', 2)
 
@@ -37,39 +36,39 @@ def writeStationFile(deltaH,deltaZ,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larva
      v.units = "meter"
      v[:]=deltaZ
 
-     v=f1.createVariable('wgt', 'f', ('cohort','larva','larvaTime','prey'),zlib=True)
-     v.long_name = "Weight at day of year , depth, given prey"
+     v=f1.createVariable('wgt', 'f', ('cohort','larva','larvaTime'),zlib=True)
+     v.long_name = "Weight at day of year and depth"
      v.units = "mg"
 
-     v=f1.createVariable('length', 'f', ('cohort','larva','larvaTime','prey'),zlib=True)
+     v=f1.createVariable('length', 'f', ('cohort','larva','larvaTime'),zlib=True)
      v.long_name = "Length at day of year , depth, given prey"
      v.units = "mm"
 
-     v=f1.createVariable('sgr', 'f', ('cohort','larva','larvaTime','prey'),zlib=True)
-     v.long_name = "SGR at day of year , depth, given prey"
+     v=f1.createVariable('sgr', 'f', ('cohort','larva','larvaTime'),zlib=True)
+     v.long_name = "SGR at day of year and depth"
      v.units = "%day-1"
 
-     v=f1.createVariable('sgrAF', 'f', ('cohort','larva','larvaTime','prey'),zlib=True)
-     v.long_name = "Maximum growth rate at day of year , depth, given prey"
+     v=f1.createVariable('sgrAF', 'f', ('cohort','larva','larvaTime'),zlib=True)
+     v.long_name = "Maximum growth rate at day of year and depth"
      v.units = "%day-1"
 
-     v=f1.createVariable('sgr_rel', 'f', ('cohort','larva','larvaTime','prey'),zlib=True)
-     v.long_name = "Growth rate relative to maximum growth rate at day of year , depth, given prey"
+     v=f1.createVariable('sgr_rel', 'f', ('cohort','larva','larvaTime'),zlib=True)
+     v.long_name = "Growth rate relative to maximum growth rate at day of year and depth"
      v.units = "%day-1"
 
-     v=f1.createVariable('survival_probability', 'f',('cohort','larva','larvaTime','prey'),zlib=True)
+     v=f1.createVariable('survival_probability', 'f',('cohort','larva','larvaTime'),zlib=True)
      v.long_name = "Survival probablity"
      v.units = "day-1"
 
-     v=f1.createVariable('temp', 'f', ('cohort','larva','larvaTime','prey'),zlib=True)
+     v=f1.createVariable('temp', 'f', ('cohort','larva','larvaTime'),zlib=True)
      v.long_name = "Temperature"
      v.units = "degrees Celsius"
 
-     v=f1.createVariable('nauplii', 'f', ('cohort','larva','larvaTime','prey'),zlib=True)
+     v=f1.createVariable('nauplii', 'f', ('cohort','larva','larvaTime'),zlib=True)
      v.long_name = "Nauplii"
      v.units = "numbers per liter"
 
-     v=f1.createVariable('depth', 'f', ('cohort','larva','larvaTime','prey'),zlib=True)
+     v=f1.createVariable('depth', 'f', ('cohort','larva','larvaTime'),zlib=True)
      v.long_name = "Depth"
      v.units = "meter"
 
@@ -79,15 +78,15 @@ def writeStationFile(deltaH,deltaZ,grdSTATION,larvaTime,W,L,SGR,larvaTdata,larva
 
      f1.variables['time'][:]   = larvaTime
 
-     f1.variables['wgt'][:,:,:,:]  = W[:,:,:,:]
-     f1.variables['length'][:,:,:,:]  = L[:,:,:,:]
-     f1.variables['sgr'][:,:,:,:]  = SGR[:,:,:,:]
-     f1.variables['sgrAF'][:,:,:,:]  = W_AF
-     f1.variables['temp'][:,:,:,:]  = larvaTdata
-     f1.variables['nauplii'][:,:,:,:]  = larvaNauplii[:,:,:,:]
-     f1.variables['depth'][:,:,:,:]  = larvaDepth
+     f1.variables['wgt'][:,:,:]  = W[:,:,:]
+     f1.variables['length'][:,:,:]  = L[:,:,:]
+     f1.variables['sgr'][:,:,:]  = SGR[:,:,:]
+     f1.variables['sgrAF'][:,:,:]  = W_AF
+     f1.variables['temp'][:,:,:]  = larvaTdata
+     f1.variables['nauplii'][:,:,:]  = larvaNauplii[:,:,:]
+     f1.variables['depth'][:,:,:]  = larvaDepth
      f1.variables['timeIndex'][:,:,:]  = startAndStop
     
     # f1.variables['sgr_rel'][:,:,:,:]  = SGR/grdSTATION.larvaSgrAF)*100.
-     f1.variables['survival_probability'][:,:,:,:]  = larvaPsur
+     f1.variables['survival_probability'][:,:,:]  = larvaPsur
      f1.close()

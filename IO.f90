@@ -16,10 +16,10 @@ Implicit None
 Contains
 
     subroutine getData(Tdata,Sdata,NH4SMdata,NH4LGdata,NO3SMdata,NO3LGdata,&
-                    &CHLAdata,windX,windY,julian,julianIndex,julianFileA,&
+                    &CHLAdata,windX,windY,zoop,julian,julianIndex,julianFileA,&
                     &julianFileB,dz1,dz2,depthindex1,depthindex2,&
-                    &inData,inDataXY,event,&
-                    &timeDim,depthDim,varDimXYZ,varDimXY)
+                    &inData,inDataXY,inDataZooplankton,event,&
+                    &timeDim,depthDim,varDimXYZ,varDimXY,II)
 
         double precision Tdata,Sdata,NH4SMdata,NH4LGdata,NO3SMdata
         double precision TauX,TauY,NO3LGdata,CHLAdata
@@ -27,21 +27,25 @@ Contains
         double precision dwB, dwA
         integer julian,julianIndex,julianFileA, julianFileB
         integer depthindex1,depthindex2
+        integer i, II
         integer timeDim, depthDim, varDimXYZ, varDimXY
 
         double precision, dimension(timeDim,depthDim,varDimXYZ):: inData
         double precision, dimension(timeDim,varDimXY):: inDataXY
+        double precision, dimension(II):: zoop
+
+        double precision, dimension(timeDim,depthDim,II):: inDataZooplankton
         character (len=32):: event
 
-!f2py intent(in) julian,julianIndex,julianFileA,julianFileB,dz1,dz2,
+!f2py intent(in) julian,julianIndex,julianFileA,julianFileB,dz1,dz2,II,inDataZooplankton
 !f2py intent(in) depthindex1,depthindex2,inData,inDataXY,event,timeDim,depthDim,varDim
-!f2py intent(in,out,overwrite) Tdata,Sdata,NH4SMdata,NH4LGdata,NO3SMdata,NO3LGdata,CHLAdata,windX,windY
+!f2py intent(in,out,overwrite) Tdata,Sdata,NH4SMdata,NH4LGdata,NO3SMdata,NO3LGdata,CHLAdata,windX,windY,zoop
 
         !Calculate weights to use on input inData from file
         dwB = abs(julian) - abs(julianFileA)
         dwA = abs(julianFileB) - abs(julian)
 
-        if (event=="REGULAR RUN") then
+        if (event=="REGULAR RUN" .OR. event=="TRISTAN RUN") then
             !Interpolate the values of temp, salt, u and v velocity in time to current julian date
             Tdata=((inData(julianIndex,depthindex1,1))*&
                 &(dwA/(dwA+dwB))+(inData(julianindex+1,depthindex1,1))*&
@@ -121,6 +125,20 @@ Contains
                 &(dwB/(dwA+dwB)))*dz1 +((inDataXY(julianIndex,2))*&
                 &(dwA/(dwA+dwB))+(inDataXY(julianIndex+1,2))*&
                 &(dwB/(dwA+dwB)))*dz2
+            do i=1,II
+                zoop(i)=((inDataZooplankton(julianIndex,depthindex1,i))*&
+                &(dwA/(dwA+dwB))+(inDataZooplankton(julianIndex+1,depthindex1,i))*&
+                &(dwB/(dwA+dwB)))*dz1 +((inDataZooplankton(julianIndex,depthindex2,i))*&
+                &(dwA/(dwA+dwB))+(inDataZooplankton(julianIndex+1,depthindex2,i))*&
+                &(dwB/(dwA+dwB)))*dz2
+                !print*,"1",i,inDataZooplankton(julianIndex,depthindex1,i),inDataZooplankton(julianIndex+1,depthindex1,i)
+                !print*,"2",i,inDataZooplankton(julianIndex,depthindex2,i),inDataZooplankton(julianIndex+1,depthindex2,i)
+            end do
+        else
+            print*,"No specific type of run defined in getData (IO.f90)"
+
+
+
 
         call convertStressToWind(TauX,TauY,windX,windY)
 
