@@ -20,7 +20,7 @@ Variables that are imported to ibm.py using from initLarva import *
 more than total number of simulation days : see function init in ibm.py"""
 NReleaseDatesInit=9500
 daysBetweenReleases=7
-Nlarva=1
+Nlarva=2
 NDaysAlive=30
 initWgt=0.09 #wgt in milligrams (mg)
 initDepth=25 # Larvae are randomly distributed in range 0-initDepth

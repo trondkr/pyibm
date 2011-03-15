@@ -203,7 +203,7 @@ def init(station,stationName,event,eventOption):
     if event == "ESM RUN":
         varlist=['temp','salt','nh4sm','nh4lg','no3sm','no3lg','chla','taux','tauy']
         startDate = datetime.datetime(2002,1,15,1,0,0)
-        endDate   = datetime.datetime(2003,1,15,1,0,0)
+        endDate   = datetime.datetime(2050,1,15,1,0,0)
         grdSTATION.chlaValue=0.0
 
     if event == 'COLD' or event=='WARM':
