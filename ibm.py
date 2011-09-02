@@ -203,7 +203,7 @@ def init(station,stationName,event,eventOption):
     if event == "ESM RUN":
         varlist=['temp','salt','nh4sm','nh4lg','no3sm','no3lg','chla','taux','tauy']
         startDate = datetime.datetime(2002,1,15,1,0,0)
-        endDate   = datetime.datetime(2050,1,15,1,0,0)
+        endDate   = datetime.datetime(2004,1,15,1,0,0)
         grdSTATION.chlaValue=0.0
 
     if event == 'COLD' or event=='WARM':
@@ -311,7 +311,7 @@ def checkReleased(releaseDate,julian,grdSTATION):
 
 
 def isAlive(julian,larvaAge,cohort,isDead):
-    if isDead[cohort]==False:
+    if not isDead[cohort]:
         #print "Larva is %s days old and belongs to cohort %s %s"%(larvaAge/(24.),cohort, NDaysAlive)
 
         if larvaAge/(24.) >= int(NDaysAlive):
@@ -411,11 +411,11 @@ def getMaxMinDepths(oldDepth,maxHourlyMove,grdSTATION):
     """The value you give deepstDepthAllowed will be the absolute deepest
     depth the larvae will move to. Useful to set this depth equal to bottom.
     grdSTATION.deepestDepthAllowed is defined from data in function IOnetcdf.getData"""
-    if (oldDepth>maxHourlyMove and oldDepth+maxHourlyMove < grdSTATION.deepestDepthAllowed):
+    if oldDepth>maxHourlyMove and oldDepth+maxHourlyMove < grdSTATION.deepestDepthAllowed:
         h_start = oldDepth - maxHourlyMove
         h_end   = oldDepth + maxHourlyMove
 
-    elif (oldDepth <= maxHourlyMove):
+    elif oldDepth <= maxHourlyMove:
         h_start=0.0
         h_end=min(grdSTATION.deepestDepthAllowed,oldDepth + maxHourlyMove)
 
@@ -1036,7 +1036,8 @@ def real_main():
 
 
 def profile_main():
-    PROFILE=True
+    PROFILE=False
+    
     if PROFILE is True:
         # This is the main function for profiling
         # We've renamed our original main() above to real_main()

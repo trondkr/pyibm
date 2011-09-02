@@ -20,7 +20,7 @@ Variables that are imported to ibm.py using from initLarva import *
 more than total number of simulation days : see function init in ibm.py"""
 NReleaseDatesInit=9500
 daysBetweenReleases=7
-Nlarva=2
+Nlarva=1
 NDaysAlive=30
 initWgt=0.09 #wgt in milligrams (mg)
 initDepth=25 # Larvae are randomly distributed in range 0-initDepth
@@ -58,7 +58,7 @@ deadThreshold=0.8   #Individuals die if weight is less than 70% of regular weigh
 costRateOfMetabolism=0.5 # The rate of how much full swimming for one time step will cost relative to routine metabolism
 
 """Here you define how many time steps you want per 24 hours"""
-dt_per_day=24
+dt_per_day=6
 deltaH = 24./(dt_per_day*1.0)	#Hours per timestep
 
 """Here you define the vertical resolution of behavior and movement meter
