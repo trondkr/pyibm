@@ -16,13 +16,13 @@ Implicit None
 Contains
 
     subroutine getData(Tdata,Sdata,NH4SMdata,NH4LGdata,NO3SMdata,NO3LGdata,&
-                    &CHLAdata,windX,windY,zoop,julian,julianIndex,julianFileA,&
+                    &CHLAdata,surfaceCHLA,windX,windY,zoop,julian,julianIndex,julianFileA,&
                     &julianFileB,dz1,dz2,depthindex1,depthindex2,&
                     &inData,inDataXY,inDataZooplankton,event,&
                     &timeDim,depthDim,varDimXYZ,varDimXY,II)
 
         double precision Tdata,Sdata,NH4SMdata,NH4LGdata,NO3SMdata
-        double precision TauX,TauY,NO3LGdata,CHLAdata
+        double precision TauX,TauY,NO3LGdata,CHLAdata,surfaceCHLA
         double precision windX,windY,dz1,dz2
         double precision dwB, dwA
         integer julian,julianIndex,julianFileA, julianFileB
@@ -39,7 +39,7 @@ Contains
 
 !f2py intent(in) julian,julianIndex,julianFileA,julianFileB,dz1,dz2,II,inDataZooplankton
 !f2py intent(in) depthindex1,depthindex2,inData,inDataXY,event,timeDim,depthDim,varDim
-!f2py intent(in,out,overwrite) Tdata,Sdata,NH4SMdata,NH4LGdata,NO3SMdata,NO3LGdata,CHLAdata,windX,windY,zoop
+!f2py intent(in,out,overwrite) Tdata,Sdata,NH4SMdata,NH4LGdata,NO3SMdata,NO3LGdata,CHLAdata,surfaceCHLA,windX,windY,zoop
 
         !Calculate weights to use on input inData from file
         dwB = abs(julian) - abs(julianFileA)
@@ -74,12 +74,14 @@ Contains
             NO3SMdata=0.0
             NO3LGdata=0.0
             CHLAdata=0.0
+            surfaceCHLA=0.0
 
         else if (event=="ESM RUN") then
             !Interpolate the values of temp, salt, u and v velocity in time to current julian date.
             !Note that the indices for 2D and 3D values are different and must be set accordingly to
             !the order the 2D and 3D variables are stored into arrays. The order is defined by the order they appear
             !in vars list defined in init funtion.
+
             Tdata=((inData(julianIndex,depthindex1,1))*&
                 &(dwA/(dwA+dwB))+(inData(julianIndex+1,depthindex1,1))*&
                 &(dwB/(dwA+dwB)))*dz1 +((inData(julianIndex,depthindex2,1))*&
@@ -115,6 +117,11 @@ Contains
                 &(dwB/(dwA+dwB)))*dz1 +((inData(julianIndex,depthindex2,7))*&
                 &(dwA/(dwA+dwB))+(inData(julianIndex+1,depthindex2,7))*&
                 &(dwB/(dwA+dwB)))*dz2
+            surfaceCHLA=((inData(julianIndex,1,7))*&
+                &(dwA/(dwA+dwB))+(inData(julianIndex+1,1,7))*&
+                &(dwB/(dwA+dwB)))*dz1 +((inData(julianIndex,2,7))*&
+                &(dwA/(dwA+dwB))+(inData(julianIndex+1,2,7))*&
+                &(dwB/(dwA+dwB)))*dz2
             TauX=((inDataXY(julianIndex,1))*&
                 &(dwA/(dwA+dwB))+(inDataXY(julianIndex+1,1))*&
                 &(dwB/(dwA+dwB)))*dz1 +((inDataXY(julianIndex,1))*&
@@ -136,13 +143,9 @@ Contains
             end do
         else
             print*,"No specific type of run defined in getData (IO.f90)"
-
-
-
+        end if
 
         call convertStressToWind(TauX,TauY,windX,windY)
-
-        end if
 
         return
 

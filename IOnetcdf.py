@@ -25,7 +25,7 @@ __modified__ = datetime.datetime(2009, 12, 2)
 __version__  = "1.2"
 __status__   = "Production, 10.6.2008,2.12.2009, 24.06.2010"
 
-def getStationData(cdf, varlist, grdSTATION, log, stationName,eventOption):
+def getStationData(cdf, varlist, grdSTATION, stationName,eventOption):
     """
     This routine reads a netCDF4 file created using IOstation.py in soda2roms. Such
     a file only contain information for one lat/long location and is therefore different
@@ -37,6 +37,10 @@ def getStationData(cdf, varlist, grdSTATION, log, stationName,eventOption):
     else:
         """Define the array as a scalar in the zooplankton variable in case not used."""
         grdSTATION.zooplankton=0.0
+    if "biasCorrectTemperature" in grdSTATION.OPTIONS:
+        bias={'North Sea':-0.620,'Iceland':-0.812,'West Greenland':0.534,'Lofoten':-0.820,'Georges Bank':3.10}
+    else:
+        bias={'North Sea': 0.0,'Iceland':0.0,'West Greeland':0.0,'Lofoten':0.0,'Georges Bank':0.0}
 
     Nvars=len(varlist)
     t= (grdSTATION.endIndex+1-grdSTATION.startIndex)
@@ -58,7 +62,6 @@ def getStationData(cdf, varlist, grdSTATION, log, stationName,eventOption):
     grdSTATION.time=cdf.variables['time'][grdSTATION.startIndex:grdSTATION.endIndex+1]
 
     for var in varlist:
-
         if var in ["taux","tauy","ssh"]:
             """2D variables"""
             var_array_rawXY[:,var_numberXY] = cdf.variables[var][grdSTATION.startIndex:grdSTATION.endIndex+1]
@@ -73,7 +76,7 @@ def getStationData(cdf, varlist, grdSTATION, log, stationName,eventOption):
 
             import zooplankton
 
-            TEMP=np.squeeze(var_array_rawXYZ[:,:,0])
+            TEMP=np.squeeze(var_array_rawXYZ[:,:,0]) - bias[stationName]
             NO3SM=np.squeeze(var_array_rawXYZ[:,:,4])
             NO3LG=np.squeeze(var_array_rawXYZ[:,:,5])
             NH4SM=np.squeeze(var_array_rawXYZ[:,:,2])
@@ -90,9 +93,13 @@ def getStationData(cdf, varlist, grdSTATION, log, stationName,eventOption):
                                                                     TEMP,prey_D,
                                                                     prey_WGT,numberOfDays,TT,DD,II)
             grdSTATION.zooplankton=accZoopArray
+
         else:
             """3D variables"""
             var_array_rawXYZ[:,:,var_numberXYZ] = cdf.variables[var][grdSTATION.startIndex:grdSTATION.endIndex+1,:]
+            if var=="temp" or var=="detemp":
+                var_array_rawXYZ[:,:,var_numberXYZ] = var_array_rawXYZ[:,:,var_numberXYZ] - bias[stationName]
+
             var_numberXYZ=var_numberXYZ+1
 
 
@@ -112,7 +119,7 @@ def getStationData(cdf, varlist, grdSTATION, log, stationName,eventOption):
 
     print "\nIOnetcdf.getData => Maximum depth for station %s has been set to: %s"%(stationName,grdSTATION.deepestDepthAllowed)
 
-    if log is True:
+    if grdSTATION.log is True:
         kXYZ=0;kXY=0
         for var in varlist:
             print "\n---> Extracted time series of %s from station %s"%(var,stationName)
@@ -126,6 +133,13 @@ def getStationData(cdf, varlist, grdSTATION, log, stationName,eventOption):
                     print '\t %i ---> Maximum %3.16f'%(prey, grdSTATION.zooplankton[:,0:index,prey].max())
                     print '\t    ---> Minimum %3.16f'%(grdSTATION.zooplankton[:,0:index,prey].min())
                     print '\t    ---> Mean %3.6f +-%3.16f \n'%(np.mean(grdSTATION.zooplankton[:,0:index,prey]), np.std(grdSTATION.zooplankton[:,0:index,prey]))
+            elif var in ["temp","detemp"]:
+                print '---> Maximum %s %3.16f'%(var, grdSTATION.data[:,0:index,kXYZ].max())
+                print '---> Minimum %s %3.16f'%(var, grdSTATION.data[:,0:index,kXYZ].min())
+                print '---> Mean %s %3.6f +-%3.16f'%(var, np.mean(grdSTATION.data[:,0:index,kXYZ]), np.std(grdSTATION.data[:,0:index,kXYZ]))
+                if bias[stationName]!=0.0:
+                    print '---> Variable %s was biascorrected %3.4f (see extractWOAstation.py and plotTempAnomaly.py)'%(var,float(bias[stationName]))
+                kXYZ+=1
             else:
                 print '---> Maximum %s %3.16f'%(var, grdSTATION.data[:,0:index,kXYZ].max())
                 print '---> Minimum %s %3.16f'%(var, grdSTATION.data[:,0:index,kXYZ].min())

@@ -8,7 +8,7 @@ Module predation
   ! ---------------------------------------------------------------
   !
   ! USAGE:
-  ! mortality, didStarve = predF90.predation.fishpredandstarvation(Mortality,Starved,FishDens,L[cohort,ind,larvaIndex-1]*mm2m,
+  ! mortality, didStarve,StarvationMortality, FishMortality, InvertebrateMortality = predF90.predation.fishpredandstarvation(Mortality,Starved,FishDens,L[cohort,ind,larvaIndex-1]*mm2m,
   !                                                                                              W[cohort,ind,larvaIndex-1],
   !                                                                                              Eb,suming,stomachFullness,beamAttCoeff,m2mm,
   !                                                                                              Ke_predator,deadThreshold,deltaH,dt)
@@ -20,20 +20,21 @@ Module predation
 
 Contains
 
-  Subroutine FishPredAndStarvation(Mortality,Starved,FishDens,Larval_m,&
+  Subroutine FishPredAndStarvation(Mortality,Starved,StarvationMortality, &
+  &FishMortality, InvertebrateMortality,FishDens,Larval_m,&
   &Larval_wgt,Eb,suming,stomachFullness,beamAttCoeff,m2mm,&
   &Ke_predator,deadThreshold,dh,seconds)
 
     USE perception
 
-    Real Mortality, Starved, FishDens, Larval_m, Larval_wgt, Eb,suming
-    Real beamAttCoeff,m2mm, Ke_predator, deadThreshold,stomachFullness
-    Real Em, VisFieldShape, FishSwimVel, aPred, bPred
-    Real visual, image, EyeSens, pi, LarvalShape, contrast, predator_VISUAL
-    Real StarvationMortality, FishMortality, InvertebrateMortality, LarvalWidth
+    double precision Mortality, Starved, FishDens, Larval_m, Larval_wgt, Eb,suming
+    double precision beamAttCoeff,m2mm, Ke_predator, deadThreshold,stomachFullness
+    double precision Em, VisFieldShape, FishSwimVel, aPred, bPred
+    double precision visual, image, EyeSens, pi, LarvalShape, contrast, predator_VISUAL
+    double precision StarvationMortality, FishMortality, InvertebrateMortality, LarvalWidth
     Integer setMort, dh, seconds, IER
 
-    !f2py intent(in,out) Mortality, Starved
+    !f2py intent(in,out) Mortality, Starved,StarvationMortality, FishMortality, InvertebrateMortality
     !f2py intent(in,overwrite) FishDens,Larval_m,Larval_wgt,Eb,suming
     !f2py intent(in,overwrite) stomachFullness,beamAttCoeff,m2mm,Ke_predator,deadThreshold,dh,seconds
 
@@ -73,28 +74,28 @@ Contains
 
   end subroutine fishPredAndStarvation
 
-  real function OtherPred(L_m,aPred,bPred,m2mm)
-    real L_m,aPred,bPred,m2mm
+  double precision function OtherPred(L_m,aPred,bPred,m2mm)
+    double precision L_m,aPred,bPred,m2mm
     !Calculate death risk from other sources"""
     OtherPred = aPred*(L_m*m2mm)**bPred
     return
   end function OtherPred
 
-  real function WeightAtLength(L_m,m2mm)
-    real L_m,m2mm
+  double precision function WeightAtLength(L_m,m2mm)
+    double precision L_m,m2mm
     !Calculate the dry body mass (ug) from length in mm (Folkvord 2005)
     WeightAtLength = (exp(-9.38+4.55*log(L_m*m2mm)-0.2046*(log(L_m*m2mm))**2.))*1000.
     return
   end function WeightAtLength
 
-  real function aliveOrDead(Larval_wgt, Larval_m,suming,stomachFullness,deadThreshold,m2mm)
+  double precision function aliveOrDead(Larval_wgt, Larval_m,suming,stomachFullness,deadThreshold,m2mm)
     ! For a given length, the weight should be a given reference weight. If the weight is
     ! less than regular weight at length, then we assume staarvation is occurring. If the weight
     ! is less than 70% (deadThreshold - initLarva.py) of the weight it should have at length we assume the larvae is dead
     ! and massively increase the mortality rate to reflect death.
     !
     ! Trond Kristiansen, 02.12.2009, 17.02.2010"""
-    real Larval_wgt,Larval_m,suming,stomachFullness, refWeight, deadThreshold, m2mm
+    double precision Larval_wgt,Larval_m,suming,stomachFullness, refWeight, deadThreshold, m2mm
 
     refWeight = WeightAtLength(Larval_m,m2mm)
 

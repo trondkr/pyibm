@@ -50,8 +50,8 @@ Contains
 
     Implicit None
 
-    Real r, c, C0, Vc, Ap, KE, EB
-    Real EPS, RST, TOL, TOLF, F1, FDER, DX
+    double precision r, c, C0, Vc, Ap, KE, EB
+    double precision EPS, RST, TOL, TOLF, F1, FDER, DX
     Integer I, IEND, AS, IER
     !
     !     Input parameters
@@ -140,8 +140,8 @@ Contains
     !     Obtain a first estimate of visual range by using a simplified
     !     expression of visual range
     Implicit None
-    Real r, C0, Ap, Vc, KE, EB
-    Real R2
+    double precision r, C0, Ap, Vc, KE, EB
+    double precision R2
     !
     !     Se calling routine for explanation of parameters
     !
@@ -158,8 +158,8 @@ Contains
 
     !     Derivation of equation for visual range of a predator
     Implicit None
-    Real r, c, C0, Ap, Vc, KE, EB
-    Real FR1, FR2, F1, FDER
+    double precision r, c, C0, Ap, Vc, KE, EB
+    double precision FR1, FR2, F1, FDER
     !
     !     Input parameters
     !        Se explanation in calling routine
